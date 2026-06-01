@@ -64,7 +64,17 @@ class OpencodeClient {
     final payload = response.data ?? const <dynamic>[];
     return payload
         .whereType<Map>()
-        .map((item) => OpencodeMessage.fromJson(Map<String, dynamic>.from(item)))
+        .map((item) {
+          final map = Map<String, dynamic>.from(item);
+          // 新格式：{ info: {...}, parts: [...] }
+          if (map.containsKey('info') && map['info'] is Map) {
+            final info = Map<String, dynamic>.from(map['info'] as Map);
+            info['parts'] = map['parts'];
+            return OpencodeMessage.fromJson(info);
+          }
+          // 旧格式：直接是 Message 对象
+          return OpencodeMessage.fromJson(map);
+        })
         .toList();
   }
 

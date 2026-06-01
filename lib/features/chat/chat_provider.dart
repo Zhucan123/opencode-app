@@ -165,7 +165,17 @@ class ChatController extends StateNotifier<ChatState> {
 
     switch (event.type) {
       case OpencodeEventType.sessionUpdated:
-        state = state.copyWith(isStreaming: true, clearError: true);
+        // session.updated 在 AI 流式生成时携带部分消息内容，需要更新
+        final streamingMsg = event.message;
+        if (streamingMsg != null) {
+          state = state.copyWith(
+            messages: _upsertMessage(state.messages, streamingMsg),
+            isStreaming: true,
+            clearError: true,
+          );
+        } else {
+          state = state.copyWith(isStreaming: true, clearError: true);
+        }
         return;
       case OpencodeEventType.sessionMessage:
         final message = event.message;

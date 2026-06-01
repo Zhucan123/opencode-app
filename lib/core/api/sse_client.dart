@@ -18,7 +18,7 @@ class SseClient {
 
   Stream<OpencodeEvent> _buildEventStream() async* {
     final response = await _dio.get<ResponseBody>(
-      '/event',
+      '/global/event',
       options: Options(
         responseType: ResponseType.stream,
         headers: const {'Accept': 'text/event-stream'},
