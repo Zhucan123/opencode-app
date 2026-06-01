@@ -28,6 +28,16 @@ jobs:
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
           echo "Keystore restored from secret"
 
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.0"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
       - name: Build debug APK
         run: flutter build apk --debug
 
