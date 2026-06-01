@@ -85,6 +85,13 @@ class OpencodeSshClient {
     onStageChanged?.call(SshConnectionStage.startingOpencode);
     final stdoutBuffer = StringBuffer();
     final stderrBuffer = StringBuffer();
+    // 先 kill 掉该端口上的残留进程（防止上次异常断开遗留）
+    final killCmd = 'fuser -k ${server.opencodePort}/tcp 2>/dev/null; '
+        'lsof -ti :${server.opencodePort} 2>/dev/null | xargs -r kill -9 2>/dev/null; '
+        'sleep 0.5';
+    final killSession = await client.execute(killCmd);
+    await killSession.done;
+
     // 补全常见安装路径（bun/npm/go/local），再 source .bashrc，确保非交互 SSH 也能找到 opencode
     final launchCmd = 'export PATH="\$HOME/.opencode/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$HOME/go/bin:\$HOME/.npm-global/bin:/usr/local/bin:\$PATH"; '
         'source \$HOME/.bashrc 2>/dev/null || true; '
