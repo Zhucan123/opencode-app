@@ -82,7 +82,8 @@ class OpencodeSshClient {
     onStageChanged?.call(SshConnectionStage.startingOpencode);
     final stdoutBuffer = StringBuffer();
     final stderrBuffer = StringBuffer();
-    final session = await client.execute('opencode serve --port ${server.opencodePort}');
+    // 用 login shell 启动，确保 PATH 与手动 SSH 登录一致（含 ~/.profile 等）
+    final session = await client.execute("bash -l -c 'opencode serve --port ${server.opencodePort}'");
     final stdoutSubscription = session.stdout
         .cast<List<int>>()
         .transform(utf8.decoder)
@@ -109,6 +110,7 @@ class OpencodeSshClient {
       );
     }
 
+    String? tunnelError;
     onStageChanged?.call(SshConnectionStage.establishingTunnel);
     final localServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, localPort);
     final acceptSubscription = localServer.listen((socket) async {
@@ -120,12 +122,18 @@ class OpencodeSshClient {
         unawaited(
           forward.stream.cast<List<int>>().pipe(socket).catchError((_) {}),
         );
-      } catch (_) {
+      } catch (e) {
+        tunnelError = e.toString();
         socket.destroy();
       }
     });
 
-    await _waitForOpencode(localPort, stdoutBuffer: stdoutBuffer, stderrBuffer: stderrBuffer);
+    await _waitForOpencode(
+      localPort,
+      stdoutBuffer: stdoutBuffer,
+      stderrBuffer: stderrBuffer,
+      tunnelErrorGetter: () => tunnelError,
+    );
 
     return ManagedSshConnection(
       client: client,
@@ -142,6 +150,7 @@ class OpencodeSshClient {
     int maxAttempts = 30,
     required StringBuffer stdoutBuffer,
     required StringBuffer stderrBuffer,
+    required String? Function() tunnelErrorGetter,
   }) async {
     // 先等 opencode 进程有足够时间监听端口
     await Future<void>.delayed(const Duration(seconds: 2));
@@ -154,10 +163,15 @@ class OpencodeSshClient {
 
     final out = stdoutBuffer.toString().trim();
     final err = stderrBuffer.toString().trim();
-    final detail = err.isNotEmpty ? err : out;
+    final tunnelErr = tunnelErrorGetter();
+    final parts = <String>[
+      if (err.isNotEmpty) '服务器stderr: $err',
+      if (out.isNotEmpty) '服务器stdout: $out',
+      if (tunnelErr != null) '隧道错误: $tunnelErr',
+    ];
     throw SshConnectionException(
-      detail.isNotEmpty
-          ? '等待 opencode 启动超时。服务器输出：$detail'
+      parts.isNotEmpty
+          ? '等待 opencode 启动超时。\n${parts.join('\n')}'
           : '等待 opencode 启动超时，请确认服务器上已安装 opencode 且在 PATH 中（可 SSH 登录后执行 opencode serve --port 4096 验证）。',
     );
   }
