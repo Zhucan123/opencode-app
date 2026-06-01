@@ -2,6 +2,7 @@ class OpencodeSession {
   const OpencodeSession({
     required this.id,
     required this.title,
+    this.parentId,
     this.createdAt,
     this.updatedAt,
     this.preview,
@@ -9,9 +10,12 @@ class OpencodeSession {
 
   final String id;
   final String title;
+  final String? parentId; // 子 agent 会话有此字段，主会话为 null
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? preview;
+
+  bool get isSubAgent => parentId != null && parentId!.isNotEmpty;
 
   factory OpencodeSession.fromJson(Map<String, dynamic> json) {
     return OpencodeSession(
@@ -19,6 +23,7 @@ class OpencodeSession {
       title: (json['title']?.toString().trim().isNotEmpty ?? false)
           ? json['title'].toString().trim()
           : 'Untitled Session',
+      parentId: json['parentID']?.toString() ?? json['parentId']?.toString(),
       createdAt: _parseDate(json['createdAt'] ?? json['created_at']),
       updatedAt: _parseDate(json['updatedAt'] ?? json['updated_at']),
       preview: json['preview']?.toString() ??

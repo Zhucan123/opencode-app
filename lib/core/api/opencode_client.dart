@@ -33,19 +33,14 @@ class OpencodeClient {
     return payload
         .whereType<Map>()
         .map((item) => OpencodeSession.fromJson(Map<String, dynamic>.from(item)))
+        .where((s) => !s.isSubAgent) // 过滤掉子 agent 会话（有 parentID 的）
         .toList()
       ..sort((left, right) {
         final rightTime = right.updatedAt ?? right.createdAt;
         final leftTime = left.updatedAt ?? left.createdAt;
-        if (rightTime == null && leftTime == null) {
-          return 0;
-        }
-        if (rightTime == null) {
-          return -1;
-        }
-        if (leftTime == null) {
-          return 1;
-        }
+        if (rightTime == null && leftTime == null) return 0;
+        if (rightTime == null) return -1;
+        if (leftTime == null) return 1;
         return rightTime.compareTo(leftTime);
       });
   }
