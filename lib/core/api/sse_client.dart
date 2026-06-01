@@ -49,8 +49,8 @@ class SseClient {
     }
 
     await for (final line in body.stream
-        .transform(StreamTransformer.fromBind(
-            (s) => s.transform(utf8.decoder)))
+        .cast<List<int>>()
+        .transform(utf8.decoder)
         .transform(const LineSplitter())) {
       if (line.isEmpty) {
         final event = parseFrame();

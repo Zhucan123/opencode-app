@@ -79,10 +79,12 @@ class OpencodeSshClient {
     final stderrBuffer = StringBuffer();
     final session = await client.execute('opencode serve --port ${server.opencodePort}');
     final stdoutSubscription = session.stdout
-        .transform(StreamTransformer.fromBind((s) => s.transform(utf8.decoder)))
+        .cast<List<int>>()
+        .transform(utf8.decoder)
         .listen(stdoutBuffer.write);
     final stderrSubscription = session.stderr
-        .transform(StreamTransformer.fromBind((s) => s.transform(utf8.decoder)))
+        .cast<List<int>>()
+        .transform(utf8.decoder)
         .listen(stderrBuffer.write);
 
     var exitedEarly = false;
