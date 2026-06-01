@@ -28,7 +28,7 @@ class ManagedSshConnection {
     required this.localServer,
     required this.localPort,
     required StreamSubscription<Socket> acceptSubscription,
-    required List<StreamSubscription<String>> logSubscriptions,
+    required List<StreamSubscription<dynamic>> logSubscriptions,
   })  : _acceptSubscription = acceptSubscription,
         _logSubscriptions = logSubscriptions;
 
@@ -37,7 +37,7 @@ class ManagedSshConnection {
   final ServerSocket localServer;
   final int localPort;
   final StreamSubscription<Socket> _acceptSubscription;
-  final List<StreamSubscription<String>> _logSubscriptions;
+  final List<StreamSubscription<dynamic>> _logSubscriptions;
 
   Future<void> close() async {
     await _acceptSubscription.cancel();
@@ -79,10 +79,10 @@ class OpencodeSshClient {
     final stderrBuffer = StringBuffer();
     final session = await client.execute('opencode serve --port ${server.opencodePort}');
     final stdoutSubscription = session.stdout
-        .transform(utf8.decoder)
+        .transform(StreamTransformer.fromBind((s) => s.transform(utf8.decoder)))
         .listen(stdoutBuffer.write);
     final stderrSubscription = session.stderr
-        .transform(utf8.decoder)
+        .transform(StreamTransformer.fromBind((s) => s.transform(utf8.decoder)))
         .listen(stderrBuffer.write);
 
     var exitedEarly = false;
