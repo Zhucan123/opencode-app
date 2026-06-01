@@ -46,7 +46,10 @@ class ManagedSshConnection {
     }
     await localServer.close();
     try {
+      // 先发 TERM，再发 KILL 确保 bash 子进程 opencode 也被杀掉
       opencodeSession.kill(SSHSignal.TERM);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      opencodeSession.kill(SSHSignal.KILL);
     } catch (_) {
       // 忽略远端会话已结束的情况。
     }
