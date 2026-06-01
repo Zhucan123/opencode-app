@@ -55,48 +55,55 @@ class OpencodeEvent {
   final String? error;
 
   factory OpencodeEvent.fromSse({required String eventName, required String data}) {
-    Map<String, dynamic> payload;
+    Map<String, dynamic> outer;
     try {
       final decoded = jsonDecode(data);
-      payload = decoded is Map
+      outer = decoded is Map
           ? Map<String, dynamic>.from(decoded)
           : <String, dynamic>{'value': decoded};
     } catch (_) {
-      payload = <String, dynamic>{'raw': data};
+      outer = <String, dynamic>{'raw': data};
     }
 
-    final rawType = payload['type']?.toString() ?? eventName;
-    final sessionJson = payload['session'];
-    final messageJson = payload['message'];
+    // 实际格式：{ "payload": { "id": "...", "type": "...", "properties": {...} } }
+    final inner = outer['payload'] is Map
+        ? Map<String, dynamic>.from(outer['payload'] as Map)
+        : outer;
+
+    final rawType = inner['type']?.toString() ?? eventName;
+    final properties = inner['properties'] is Map
+        ? Map<String, dynamic>.from(inner['properties'] as Map)
+        : <String, dynamic>{};
+
+    final sessionJson = properties['session'] ?? inner['session'];
+    final messageJson = properties['message'] ?? inner['message'];
 
     return OpencodeEvent(
       type: OpencodeEventType.fromName(rawType),
       rawType: rawType,
-      payload: payload,
+      payload: inner,
       session: sessionJson is Map
           ? OpencodeSession.fromJson(Map<String, dynamic>.from(sessionJson))
           : null,
       message: messageJson is Map
           ? OpencodeMessage.fromJson(Map<String, dynamic>.from(messageJson))
           : null,
-      tool: payload['tool']?.toString(),
-      input: payload['input'] is Map
-          ? Map<String, dynamic>.from(payload['input'] as Map)
+      tool: properties['tool']?.toString() ?? inner['tool']?.toString(),
+      input: properties['input'] is Map
+          ? Map<String, dynamic>.from(properties['input'] as Map)
           : null,
-      output: payload['output']?.toString(),
-      permissionId: payload['id']?.toString(),
-      sessionId: payload['sessionId']?.toString() ??
-          payload['session_id']?.toString() ??
+      output: properties['output']?.toString() ?? inner['output']?.toString(),
+      permissionId: properties['id']?.toString() ?? inner['id']?.toString(),
+      sessionId: properties['sessionId']?.toString() ??
+          properties['session_id']?.toString() ??
           (messageJson is Map
               ? messageJson['sessionId']?.toString() ??
                   messageJson['session_id']?.toString()
               : null) ??
-          (sessionJson is Map
-              ? sessionJson['id']?.toString()
-              : null),
-      title: payload['title']?.toString(),
-      command: payload['command']?.toString(),
-      error: payload['error']?.toString(),
+          (sessionJson is Map ? sessionJson['id']?.toString() : null),
+      title: properties['title']?.toString() ?? inner['title']?.toString(),
+      command: properties['command']?.toString() ?? inner['command']?.toString(),
+      error: properties['error']?.toString() ?? inner['error']?.toString(),
     );
   }
 }
