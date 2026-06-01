@@ -22,6 +22,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
   late final TextEditingController _passwordController;
   late final TextEditingController _pemKeyController;
   late final TextEditingController _opencodePortController;
+  late final TextEditingController _workingDirController;
   late SshAuthType _authType;
   bool _isSaving = false;
 
@@ -39,6 +40,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
     _passwordController = TextEditingController(text: server?.password ?? '');
     _pemKeyController = TextEditingController(text: server?.pemKey ?? '');
     _opencodePortController = TextEditingController(text: '${server?.opencodePort ?? 4096}');
+    _workingDirController = TextEditingController(text: server?.workingDirectory ?? '');
     _authType = server?.authType ?? SshAuthType.password;
   }
 
@@ -51,6 +53,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
     _passwordController.dispose();
     _pemKeyController.dispose();
     _opencodePortController.dispose();
+    _workingDirController.dispose();
     super.dispose();
   }
 
@@ -145,6 +148,16 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
               keyboardType: TextInputType.number,
               validator: _portValidator,
             ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _workingDirController,
+              decoration: const InputDecoration(
+                labelText: '工作目录（可选）',
+                hintText: '例：/home/ubuntu/my-project',
+                prefixIcon: Icon(Icons.folder_outlined),
+              ),
+              keyboardType: TextInputType.url,
+            ),
             const SizedBox(height: 32),
             FilledButton(
               onPressed: _isSaving ? null : _saveServer,
@@ -187,6 +200,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
         authType: _authType,
         password: _authType == SshAuthType.password ? _passwordController.text : '',
         pemKey: _authType == SshAuthType.pemKey ? _pemKeyController.text.trim() : '',
+        workingDirectory: _workingDirController.text.trim(),
         lastConnected: widget.initialServer?.lastConnected,
       );
       await ref.read(serverListProvider.notifier).saveServer(config);

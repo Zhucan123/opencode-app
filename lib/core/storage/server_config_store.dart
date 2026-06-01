@@ -19,6 +19,7 @@ class ServerConfig {
     this.authType = SshAuthType.password,
     this.password = '',
     this.pemKey = '',
+    this.workingDirectory = '',
     this.lastConnected,
   });
 
@@ -31,6 +32,7 @@ class ServerConfig {
   final SshAuthType authType;
   final String password;
   final String pemKey;
+  final String workingDirectory;
   final DateTime? lastConnected;
 
   String get addressLabel => '$username@$host';
@@ -51,6 +53,7 @@ class ServerConfig {
       authType: authTypeRaw == 'pemKey' ? SshAuthType.pemKey : SshAuthType.password,
       password: password,
       pemKey: pemKey,
+      workingDirectory: json['workingDirectory']?.toString() ?? '',
       lastConnected: _parseDate(json['lastConnected']),
     );
   }
@@ -64,6 +67,7 @@ class ServerConfig {
       'username': username,
       'opencodePort': opencodePort,
       'authType': authType == SshAuthType.pemKey ? 'pemKey' : 'password',
+      'workingDirectory': workingDirectory,
       'lastConnected': lastConnected?.toIso8601String(),
     };
   }
@@ -78,6 +82,7 @@ class ServerConfig {
     SshAuthType? authType,
     String? password,
     String? pemKey,
+    String? workingDirectory,
     DateTime? lastConnected,
   }) {
     return ServerConfig(
@@ -90,6 +95,7 @@ class ServerConfig {
       authType: authType ?? this.authType,
       password: password ?? this.password,
       pemKey: pemKey ?? this.pemKey,
+      workingDirectory: workingDirectory ?? this.workingDirectory,
       lastConnected: lastConnected ?? this.lastConnected,
     );
   }
