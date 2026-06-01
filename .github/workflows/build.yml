@@ -44,14 +44,11 @@ jobs:
             echo "⚠️ Save the keystore-base64 artifact as GitHub Secret KEYSTORE_BASE64 for consistent signing"
           fi
 
-      - name: Export keystore base64 (first-time only)
-        if: ${{ secrets.KEYSTORE_BASE64 == '' }}
+      - name: Export keystore base64
         run: |
           base64 -w 0 "${{ github.workspace }}/android/app/debug.keystore" > /tmp/keystore.b64
-          echo "Keystore base64 saved to artifact"
 
-      - name: Upload keystore base64 (first-time only)
-        if: ${{ secrets.KEYSTORE_BASE64 == '' }}
+      - name: Upload keystore base64
         uses: actions/upload-artifact@v4
         with:
           name: keystore-base64
