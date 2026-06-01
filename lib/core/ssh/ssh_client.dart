@@ -137,22 +137,33 @@ class OpencodeSshClient {
     );
   }
 
-  Future<void> _waitForOpencode(int localPort, {int maxAttempts = 20}) async {
-    final client = HttpClient();
-    client.connectionTimeout = const Duration(seconds: 2);
+  Future<void> _waitForOpencode(int localPort, {int maxAttempts = 30}) async {
+    // 先等 opencode 进程有足够时间监听端口
+    await Future<void>.delayed(const Duration(seconds: 2));
+
     for (var i = 0; i < maxAttempts; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      try {
-        final request = await client.get('127.0.0.1', localPort, '/session');
+      final success = await _tryHealthCheck(localPort);
+      if (success) return;
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+    }
+    throw const SshConnectionException('等待 opencode 启动超时，请检查服务器上是否已安装 opencode。');
+  }
+
+  Future<bool> _tryHealthCheck(int localPort) async {
+    final httpClient = HttpClient();
+    httpClient.connectionTimeout = const Duration(seconds: 3);
+    try {
+      await () async {
+        final request = await httpClient.get('127.0.0.1', localPort, '/session');
         final response = await request.close();
         await response.drain<void>();
-        client.close();
-        return;
-      } catch (_) {
-        // opencode 还没就绪，继续等待
-      }
+      }().timeout(const Duration(seconds: 5));
+      // 成功完成 = opencode 已就绪
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      httpClient.close(force: true);
     }
-    client.close();
-    throw const SshConnectionException('等待 opencode 启动超时，请检查服务器上是否已安装 opencode。');
   }
 }
