@@ -5,9 +5,12 @@ import 'package:code_app/core/api/models/session.dart';
 
 enum OpencodeEventType {
   sessionUpdated,
-  messageUpdated,   // 实际事件名：message.updated（不是 session.message）
-  toolCalled,       // 实际事件名：session.next.tool.called（不是 tool.execution）
-  permissionAsked,  // 实际事件名：permission.asked（不是 permission.requested）
+  messageUpdated,
+  messagePartUpdated,
+  messagePartDelta,
+  messagePartRemoved,
+  toolCalled,
+  permissionAsked,
   sessionError,
   unknown;
 
@@ -15,6 +18,9 @@ enum OpencodeEventType {
     return switch (name) {
       'session.updated' => OpencodeEventType.sessionUpdated,
       'message.updated' => OpencodeEventType.messageUpdated,
+      'message.part.updated' => OpencodeEventType.messagePartUpdated,
+      'message.part.delta' => OpencodeEventType.messagePartDelta,
+      'message.part.removed' => OpencodeEventType.messagePartRemoved,
       'session.next.tool.called' => OpencodeEventType.toolCalled,
       'permission.asked' => OpencodeEventType.permissionAsked,
       'session.error' => OpencodeEventType.sessionError,
@@ -30,6 +36,9 @@ class OpencodeEvent {
     required this.payload,
     this.session,
     this.message,
+    this.part,
+    this.partDelta,
+    this.removedPartId,
     this.tool,
     this.input,
     this.output,
@@ -45,6 +54,9 @@ class OpencodeEvent {
   final Map<String, dynamic> payload;
   final OpencodeSession? session;
   final OpencodeMessage? message;
+  final MessagePartEvent? part;
+  final MessagePartDelta? partDelta;
+  final String? removedPartId;
   final String? tool;
   final Map<String, dynamic>? input;
   final String? output;
@@ -65,7 +77,6 @@ class OpencodeEvent {
       outer = <String, dynamic>{'raw': data};
     }
 
-    // 实际格式：{ "payload": { "id": "...", "type": "...", "properties": {...} } }
     final inner = outer['payload'] is Map
         ? Map<String, dynamic>.from(outer['payload'] as Map)
         : outer;
@@ -75,27 +86,38 @@ class OpencodeEvent {
         ? Map<String, dynamic>.from(inner['properties'] as Map)
         : <String, dynamic>{};
 
-    // 实际字段：sessionID（大写D），info（而不是 session/message）
     final sessionIdStr = properties['sessionID']?.toString() ??
         properties['sessionId']?.toString() ??
         properties['session_id']?.toString();
 
-    // session.updated 和 message.updated 都把对象放在 properties['info']
     final infoJson = properties['info'];
-
     OpencodeSession? session;
     OpencodeMessage? message;
-
     if (rawType == 'session.updated' && infoJson is Map) {
       session = OpencodeSession.fromJson(Map<String, dynamic>.from(infoJson));
     } else if (rawType == 'message.updated' && infoJson is Map) {
       message = OpencodeMessage.fromJson(Map<String, dynamic>.from(infoJson));
     }
 
-    // tool.called 事件：properties 直接含 tool、input
-    final toolName = properties['tool']?.toString() ?? inner['tool']?.toString();
-    final inputMap = properties['input'] is Map
-        ? Map<String, dynamic>.from(properties['input'] as Map)
+    MessagePartEvent? part;
+    if (rawType == 'message.part.updated' && properties['part'] is Map) {
+      part = MessagePartEvent.fromJson(
+          Map<String, dynamic>.from(properties['part'] as Map));
+    }
+
+    MessagePartDelta? partDelta;
+    if (rawType == 'message.part.delta') {
+      partDelta = MessagePartDelta(
+        sessionId: sessionIdStr ?? '',
+        messageId: properties['messageID']?.toString() ?? '',
+        partId: properties['partID']?.toString() ?? '',
+        field: properties['field']?.toString() ?? 'text',
+        delta: properties['delta']?.toString() ?? '',
+      );
+    }
+
+    final removedPartId = rawType == 'message.part.removed'
+        ? properties['partID']?.toString()
         : null;
 
     return OpencodeEvent(
@@ -104,17 +126,73 @@ class OpencodeEvent {
       payload: inner,
       session: session,
       message: message,
-      tool: toolName,
-      input: inputMap,
+      part: part,
+      partDelta: partDelta,
+      removedPartId: removedPartId,
+      tool: properties['tool']?.toString() ?? inner['tool']?.toString(),
+      input: properties['input'] is Map
+          ? Map<String, dynamic>.from(properties['input'] as Map)
+          : null,
       output: properties['output']?.toString() ?? inner['output']?.toString(),
-      // permission.asked 事件：properties['id'] 是权限 ID
       permissionId: properties['id']?.toString() ?? inner['id']?.toString(),
       sessionId: sessionIdStr ??
-          (message?.sessionId) ??
-          (session?.id),
+          part?.sessionId ??
+          partDelta?.sessionId ??
+          message?.sessionId ??
+          session?.id,
       title: properties['title']?.toString() ?? inner['title']?.toString(),
       command: properties['command']?.toString() ?? inner['command']?.toString(),
       error: properties['error']?.toString() ?? inner['error']?.toString(),
     );
   }
+}
+
+class MessagePartEvent {
+  const MessagePartEvent({
+    required this.id,
+    required this.messageId,
+    required this.sessionId,
+    required this.type,
+    this.text,
+  });
+
+  final String id;
+  final String messageId;
+  final String sessionId;
+  final String type;
+  final String? text;
+
+  factory MessagePartEvent.fromJson(Map<String, dynamic> json) {
+    return MessagePartEvent(
+      id: json['id']?.toString() ?? '',
+      messageId: json['messageID']?.toString() ??
+          json['messageId']?.toString() ?? '',
+      sessionId: json['sessionID']?.toString() ??
+          json['sessionId']?.toString() ?? '',
+      type: json['type']?.toString() ?? 'text',
+      text: json['text']?.toString(),
+    );
+  }
+
+  bool get isSkippable =>
+      type == 'patch' || type == 'step-start' || type == 'step-finish';
+
+  MessagePart toMessagePart() =>
+      MessagePart(type: MessagePartType.text, text: text ?? '');
+}
+
+class MessagePartDelta {
+  const MessagePartDelta({
+    required this.sessionId,
+    required this.messageId,
+    required this.partId,
+    required this.field,
+    required this.delta,
+  });
+
+  final String sessionId;
+  final String messageId;
+  final String partId;
+  final String field;
+  final String delta;
 }

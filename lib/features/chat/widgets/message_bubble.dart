@@ -4,9 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 class MessageBubble extends StatelessWidget {
-  const MessageBubble({super.key, required this.message});
+  const MessageBubble({
+    super.key,
+    required this.message,
+    this.streamingText,
+  });
 
   final OpencodeMessage message;
+  /// 流式传输时的累积文本，优先于 message.parts
+  final String? streamingText;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +36,12 @@ class MessageBubble extends StatelessWidget {
                   border: Border.all(color: AppColors.border),
                 )
               : null,
-          child: isUser ? _UserMessageText(message: message) : _AssistantMessageMarkdown(message: message),
+          child: isUser
+              ? _UserMessageText(message: message)
+              : _AssistantMessageMarkdown(
+                  message: message,
+                  streamingText: streamingText,
+                ),
         ),
       ),
     );
@@ -52,15 +63,20 @@ class _UserMessageText extends StatelessWidget {
 }
 
 class _AssistantMessageMarkdown extends StatelessWidget {
-  const _AssistantMessageMarkdown({required this.message});
+  const _AssistantMessageMarkdown({required this.message, this.streamingText});
 
   final OpencodeMessage message;
+  final String? streamingText;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    // 优先用流式累积文本，其次用 message.parts
+    final content = (streamingText != null && streamingText!.isNotEmpty)
+        ? streamingText!
+        : _toMarkdown(message.parts);
     return MarkdownBody(
-      data: _toMarkdown(message.parts),
+      data: content,
       selectable: true,
       styleSheet: MarkdownStyleSheet(
         p: textTheme.bodyLarge,

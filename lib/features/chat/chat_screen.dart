@@ -72,9 +72,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 16),
                       itemBuilder: (context, index) {
                         if (state.isStreaming && index == state.messages.length) {
+                          // 检查最后一条 assistant 消息是否已有流式内容
+                          final lastMsg = state.messages.isNotEmpty ? state.messages.last : null;
+                          final hasStreamingContent = lastMsg != null &&
+                              state.streamingTextFor(lastMsg.id).isNotEmpty;
+                          if (hasStreamingContent) {
+                            // 已有内容，不显示思考泡（消息气泡已经在更新）
+                            return const SizedBox.shrink();
+                          }
                           return const _ThinkingBubble();
                         }
-                        return MessageBubble(message: state.messages[index]);
+                        final msg = state.messages[index];
+                        final streamingText = state.streamingTextFor(msg.id);
+                        return MessageBubble(
+                          message: msg,
+                          streamingText: streamingText.isNotEmpty ? streamingText : null,
+                        );
                       },
                     ),
             ),
