@@ -138,20 +138,21 @@ class OpencodeSshClient {
   }
 
   Future<void> _waitForOpencode(int localPort, {int maxAttempts = 20}) async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 2);
     for (var i = 0; i < maxAttempts; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
       try {
-        final socket = await Socket.connect(
-          InternetAddress.loopbackIPv4,
-          localPort,
-          timeout: const Duration(seconds: 2),
-        );
-        await socket.close();
+        final request = await client.get('127.0.0.1', localPort, '/session');
+        final response = await request.close();
+        await response.drain<void>();
+        client.close();
         return;
       } catch (_) {
         // opencode 还没就绪，继续等待
       }
     }
+    client.close();
     throw const SshConnectionException('等待 opencode 启动超时，请检查服务器上是否已安装 opencode。');
   }
 }
