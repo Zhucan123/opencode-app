@@ -88,7 +88,7 @@ class OpencodeSshClient {
     // 补全常见安装路径（bun/npm/go/local），再 source .bashrc，确保非交互 SSH 也能找到 opencode
     final launchCmd = 'export PATH="\$HOME/.opencode/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$HOME/go/bin:\$HOME/.npm-global/bin:/usr/local/bin:\$PATH"; '
         'source \$HOME/.bashrc 2>/dev/null || true; '
-        'opencode serve --port ${server.opencodePort}';
+        'exec opencode serve --port ${server.opencodePort}';  // exec 替换 bash 进程，SIGTERM/SIGKILL 直接打到 opencode
     final session = await client.execute('bash -l -c \'$launchCmd\'');
     final stdoutSubscription = session.stdout
         .cast<List<int>>()
