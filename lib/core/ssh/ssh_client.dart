@@ -1,0 +1,129 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:code_app/core/storage/server_config_store.dart';
+import 'package:dartssh2/dartssh2.dart';
+
+enum SshConnectionStage {
+  sshHandshake,
+  authentication,
+  startingOpencode,
+  establishingTunnel,
+}
+
+class SshConnectionException implements Exception {
+  const SshConnectionException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class ManagedSshConnection {
+  ManagedSshConnection({
+    required this.client,
+    required this.opencodeSession,
+    required this.localServer,
+    required this.localPort,
+    required StreamSubscription<Socket> acceptSubscription,
+    required List<StreamSubscription<String>> logSubscriptions,
+  })  : _acceptSubscription = acceptSubscription,
+        _logSubscriptions = logSubscriptions;
+
+  final SSHClient client;
+  final SSHSession opencodeSession;
+  final ServerSocket localServer;
+  final int localPort;
+  final StreamSubscription<Socket> _acceptSubscription;
+  final List<StreamSubscription<String>> _logSubscriptions;
+
+  Future<void> close() async {
+    await _acceptSubscription.cancel();
+    for (final subscription in _logSubscriptions) {
+      await subscription.cancel();
+    }
+    await localServer.close();
+    try {
+      opencodeSession.kill(SSHSignal.TERM);
+    } catch (_) {
+      // 忽略远端会话已结束的情况。
+    }
+    client.close();
+  }
+}
+
+class OpencodeSshClient {
+  Future<ManagedSshConnection> connect({
+    required ServerConfig server,
+    required int localPort,
+    void Function(SshConnectionStage stage)? onStageChanged,
+  }) async {
+    onStageChanged?.call(SshConnectionStage.sshHandshake);
+    final socket = await SSHSocket.connect(server.host, server.sshPort);
+
+    final client = SSHClient(
+      socket,
+      username: server.username,
+      onPasswordRequest: () => server.password,
+      onVerifyHostKey: (_, __) => true,
+      keepAliveInterval: const Duration(seconds: 30),
+    );
+
+    onStageChanged?.call(SshConnectionStage.authentication);
+    await client.authenticated;
+
+    onStageChanged?.call(SshConnectionStage.startingOpencode);
+    final stdoutBuffer = StringBuffer();
+    final stderrBuffer = StringBuffer();
+    final session = await client.execute('opencode serve --port ${server.opencodePort}');
+    final stdoutSubscription = session.stdout
+        .transform(utf8.decoder)
+        .listen(stdoutBuffer.write);
+    final stderrSubscription = session.stderr
+        .transform(utf8.decoder)
+        .listen(stderrBuffer.write);
+
+    var exitedEarly = false;
+    unawaited(session.done.then((_) {
+      exitedEarly = true;
+    }));
+
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (exitedEarly) {
+      final stderr = stderrBuffer.toString().trim();
+      final stdout = stdoutBuffer.toString().trim();
+      final detail = stderr.isNotEmpty ? stderr : stdout;
+      client.close();
+      throw SshConnectionException(
+        detail.isEmpty ? '远端 opencode 服务启动后立即退出。' : '远端 opencode 启动失败：$detail',
+      );
+    }
+
+    onStageChanged?.call(SshConnectionStage.establishingTunnel);
+    final localServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, localPort);
+    final acceptSubscription = localServer.listen((socket) async {
+      try {
+        final forward = await client.forwardLocal('localhost', server.opencodePort);
+        unawaited(
+          socket.cast<List<int>>().pipe(forward.sink).catchError((_) {}),
+        );
+        unawaited(
+          forward.stream.cast<List<int>>().pipe(socket).catchError((_) {}),
+        );
+      } catch (_) {
+        socket.destroy();
+      }
+    });
+
+    return ManagedSshConnection(
+      client: client,
+      opencodeSession: session,
+      localServer: localServer,
+      localPort: localPort,
+      acceptSubscription: acceptSubscription,
+      logSubscriptions: [stdoutSubscription, stderrSubscription],
+    );
+  }
+}

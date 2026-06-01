@@ -1,0 +1,34 @@
+name: code_app
+description: OpenCode Mobile Phase 1 Flutter app.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  dartssh2: ^2.9.0
+  dio: ^5.4.0
+  flutter_secure_storage: ^9.0.0
+  flutter_riverpod: ^2.5.0
+  riverpod_annotation: ^2.3.0
+  go_router: ^13.0.0
+  flutter_markdown: ^0.7.0
+  flutter_highlight: ^0.7.0
+  diff_match_patch: ^0.4.1
+  uuid: ^4.3.0
+  json_annotation: ^4.8.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+  build_runner: ^2.4.0
+  riverpod_generator: ^2.4.0
+  json_serializable: ^6.7.0
+
+flutter:
+  uses-material-design: true
