@@ -12,9 +12,12 @@ class OpencodeClient {
               BaseOptions(
                 baseUrl: 'http://$host:$port',
                 connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 30),
+                receiveTimeout: const Duration(seconds: 120),
                 sendTimeout: const Duration(seconds: 10),
                 responseType: ResponseType.json,
+                // SSH 隧道每次 forwardLocal 是独立 channel，不支持 keep-alive 复用
+                // 强制 Connection: close 确保每次请求用新 TCP 连接
+                headers: const {'Connection': 'close'},
               ),
             );
 
