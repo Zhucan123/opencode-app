@@ -97,7 +97,8 @@ class OpencodeSshClient {
       exitedEarly = true;
     }));
 
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    // 等待 opencode 进程有时间报错后再判断是否早退
+    await Future<void>.delayed(const Duration(milliseconds: 800));
     if (exitedEarly) {
       final stderr = stderrBuffer.toString().trim();
       final stdout = stdoutBuffer.toString().trim();
@@ -124,6 +125,8 @@ class OpencodeSshClient {
       }
     });
 
+    await _waitForOpencode(localPort);
+
     return ManagedSshConnection(
       client: client,
       opencodeSession: session,
@@ -132,5 +135,23 @@ class OpencodeSshClient {
       acceptSubscription: acceptSubscription,
       logSubscriptions: [stdoutSubscription, stderrSubscription],
     );
+  }
+
+  Future<void> _waitForOpencode(int localPort, {int maxAttempts = 20}) async {
+    for (var i = 0; i < maxAttempts; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      try {
+        final socket = await Socket.connect(
+          InternetAddress.loopbackIPv4,
+          localPort,
+          timeout: const Duration(seconds: 2),
+        );
+        await socket.close();
+        return;
+      } catch (_) {
+        // opencode 还没就绪，继续等待
+      }
+    }
+    throw const SshConnectionException('等待 opencode 启动超时，请检查服务器上是否已安装 opencode。');
   }
 }
