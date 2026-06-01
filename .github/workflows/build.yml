@@ -25,45 +25,8 @@ jobs:
       - name: Setup keystore
         run: |
           KEYSTORE_PATH="${{ github.workspace }}/android/app/debug.keystore"
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            # 从 Secret 恢复 keystore（固定签名）
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
-            echo "Restored keystore from secret"
-          else
-            # 首次运行：生成 keystore 并上传 base64，之后需手动保存为 Secret
-            keytool -genkeypair -v \
-              -keystore "$KEYSTORE_PATH" \
-              -alias code-app \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass android123 \
-              -keypass android123 \
-              -dname "CN=CodeApp Debug, OU=Dev, O=CodeApp, L=Shanghai, ST=Shanghai, C=CN"
-            echo "Generated new keystore (one-time)"
-            echo "⚠️ Save the keystore-base64 artifact as GitHub Secret KEYSTORE_BASE64 for consistent signing"
-          fi
-
-      - name: Export keystore base64
-        run: |
-          base64 -w 0 "${{ github.workspace }}/android/app/debug.keystore" > /tmp/keystore.b64
-
-      - name: Upload keystore base64
-        uses: actions/upload-artifact@v4
-        with:
-          name: keystore-base64
-          path: /tmp/keystore.b64
-          retention-days: 7
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.0"
-          channel: stable
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
+          echo "Keystore restored from secret"
 
       - name: Build debug APK
         run: flutter build apk --debug
