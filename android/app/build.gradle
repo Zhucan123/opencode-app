@@ -18,6 +18,18 @@ android {
         jvmTarget = '17'
     }
 
+    signingConfigs {
+        appDebug {
+            def keystoreFile = file("debug.keystore")
+            if (keystoreFile.exists()) {
+                storeFile keystoreFile
+                storePassword 'android123'
+                keyAlias 'code-app'
+                keyPassword 'android123'
+            }
+        }
+    }
+
     defaultConfig {
         applicationId 'ai.opencode.mobile'
         minSdkVersion flutter.minSdkVersion
@@ -27,8 +39,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.appDebug.storeFile?.exists()
+                ? signingConfigs.appDebug
+                : signingConfigs.debug
+        }
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.appDebug.storeFile?.exists()
+                ? signingConfigs.appDebug
+                : signingConfigs.debug
         }
     }
 }
