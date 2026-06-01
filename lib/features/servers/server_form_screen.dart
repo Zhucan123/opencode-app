@@ -20,7 +20,9 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
   late final TextEditingController _userController;
   late final TextEditingController _portController;
   late final TextEditingController _passwordController;
+  late final TextEditingController _pemKeyController;
   late final TextEditingController _opencodePortController;
+  late SshAuthType _authType;
   bool _isSaving = false;
 
   bool get _isEditing => widget.initialServer != null;
@@ -35,7 +37,9 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
     _userController = TextEditingController(text: server?.username ?? '');
     _portController = TextEditingController(text: '${server?.sshPort ?? 22}');
     _passwordController = TextEditingController(text: server?.password ?? '');
+    _pemKeyController = TextEditingController(text: server?.pemKey ?? '');
     _opencodePortController = TextEditingController(text: '${server?.opencodePort ?? 4096}');
+    _authType = server?.authType ?? SshAuthType.password;
   }
 
   @override
@@ -45,6 +49,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
     _userController.dispose();
     _portController.dispose();
     _passwordController.dispose();
+    _pemKeyController.dispose();
     _opencodePortController.dispose();
     super.dispose();
   }
@@ -67,6 +72,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
             TextFormField(
               controller: _hostController,
               decoration: const InputDecoration(labelText: '主机地址'),
+              keyboardType: TextInputType.url,
               validator: _requiredValidator,
             ),
             const SizedBox(height: 16),
@@ -91,13 +97,47 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: '密码'),
-              obscureText: true,
-              validator: _requiredValidator,
+            const SizedBox(height: 20),
+            Text('认证方式', style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 8),
+            SegmentedButton<SshAuthType>(
+              segments: const [
+                ButtonSegment(
+                  value: SshAuthType.password,
+                  label: Text('密码'),
+                  icon: Icon(Icons.lock_outline),
+                ),
+                ButtonSegment(
+                  value: SshAuthType.pemKey,
+                  label: Text('PEM 私钥'),
+                  icon: Icon(Icons.key_outlined),
+                ),
+              ],
+              selected: {_authType},
+              onSelectionChanged: (selected) {
+                setState(() => _authType = selected.first);
+              },
             ),
+            const SizedBox(height: 16),
+            if (_authType == SshAuthType.password)
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: '密码'),
+                obscureText: true,
+                validator: _authType == SshAuthType.password ? _requiredValidator : null,
+              )
+            else
+              TextFormField(
+                controller: _pemKeyController,
+                decoration: const InputDecoration(
+                  labelText: 'PEM 私钥内容',
+                  hintText: '-----BEGIN RSA PRIVATE KEY-----\n...',
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 6,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                validator: _authType == SshAuthType.pemKey ? _requiredValidator : null,
+              ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _opencodePortController,
@@ -123,30 +163,19 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
   }
 
   String? _requiredValidator(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return '此项不能为空';
-    }
+    if (value == null || value.trim().isEmpty) return '此项不能为空';
     return null;
   }
 
   String? _portValidator(String? value) {
-    final text = value?.trim() ?? '';
-    final port = int.tryParse(text);
-    if (port == null || port <= 0 || port > 65535) {
-      return '请输入有效端口';
-    }
+    final port = int.tryParse(value?.trim() ?? '');
+    if (port == null || port <= 0 || port > 65535) return '请输入有效端口';
     return null;
   }
 
   Future<void> _saveServer() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      _isSaving = true;
-    });
-
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
     try {
       final config = ServerConfig(
         id: widget.initialServer?.id ?? '',
@@ -154,14 +183,14 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
         host: _hostController.text.trim(),
         sshPort: int.parse(_portController.text.trim()),
         username: _userController.text.trim(),
-        password: _passwordController.text,
         opencodePort: int.parse(_opencodePortController.text.trim()),
+        authType: _authType,
+        password: _authType == SshAuthType.password ? _passwordController.text : '',
+        pemKey: _authType == SshAuthType.pemKey ? _pemKeyController.text.trim() : '',
         lastConnected: widget.initialServer?.lastConnected,
       );
       await ref.read(serverListProvider.notifier).saveServer(config);
-      if (mounted) {
-        context.pop();
-      }
+      if (mounted) context.pop();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -169,11 +198,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 }

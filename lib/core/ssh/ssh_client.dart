@@ -66,7 +66,12 @@ class OpencodeSshClient {
     final client = SSHClient(
       socket,
       username: server.username,
-      onPasswordRequest: () => server.password,
+      onPasswordRequest: server.authType == SshAuthType.password
+          ? () => server.password
+          : null,
+      identities: server.authType == SshAuthType.pemKey && server.pemKey.isNotEmpty
+          ? SSHKeyPair.fromPem(server.pemKey)
+          : null,
       onVerifyHostKey: (_, __) => true,
       keepAliveInterval: const Duration(seconds: 30),
     );
