@@ -98,8 +98,8 @@ class OpencodeSshClient {
       exitedEarly = true;
     }));
 
-    // 等待 opencode 进程有时间报错后再判断是否早退
-    await Future<void>.delayed(const Duration(milliseconds: 800));
+    // 等待 opencode 进程有时间报错后再判断是否早退（2s 以防服务器延迟响应）
+    await Future<void>.delayed(const Duration(milliseconds: 2000));
     if (exitedEarly) {
       final stderr = stderrBuffer.toString().trim();
       final stdout = stdoutBuffer.toString().trim();
