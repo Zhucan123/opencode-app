@@ -125,7 +125,7 @@ class OpencodeSshClient {
       }
     });
 
-    await _waitForOpencode(localPort);
+    await _waitForOpencode(localPort, stdoutBuffer: stdoutBuffer, stderrBuffer: stderrBuffer);
 
     return ManagedSshConnection(
       client: client,
@@ -137,7 +137,12 @@ class OpencodeSshClient {
     );
   }
 
-  Future<void> _waitForOpencode(int localPort, {int maxAttempts = 30}) async {
+  Future<void> _waitForOpencode(
+    int localPort, {
+    int maxAttempts = 30,
+    required StringBuffer stdoutBuffer,
+    required StringBuffer stderrBuffer,
+  }) async {
     // 先等 opencode 进程有足够时间监听端口
     await Future<void>.delayed(const Duration(seconds: 2));
 
@@ -146,7 +151,15 @@ class OpencodeSshClient {
       if (success) return;
       await Future<void>.delayed(const Duration(milliseconds: 800));
     }
-    throw const SshConnectionException('等待 opencode 启动超时，请检查服务器上是否已安装 opencode。');
+
+    final out = stdoutBuffer.toString().trim();
+    final err = stderrBuffer.toString().trim();
+    final detail = err.isNotEmpty ? err : out;
+    throw SshConnectionException(
+      detail.isNotEmpty
+          ? '等待 opencode 启动超时。服务器输出：$detail'
+          : '等待 opencode 启动超时，请确认服务器上已安装 opencode 且在 PATH 中（可 SSH 登录后执行 opencode serve --port 4096 验证）。',
+    );
   }
 
   Future<bool> _tryHealthCheck(int localPort) async {
