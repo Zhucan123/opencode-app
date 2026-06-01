@@ -82,8 +82,11 @@ class OpencodeSshClient {
     onStageChanged?.call(SshConnectionStage.startingOpencode);
     final stdoutBuffer = StringBuffer();
     final stderrBuffer = StringBuffer();
-    // 用 login shell 启动，确保 PATH 与手动 SSH 登录一致（含 ~/.profile 等）
-    final session = await client.execute("bash -l -c 'opencode serve --port ${server.opencodePort}'");
+    // 补全常见安装路径（bun/npm/go/local），再 source .bashrc，确保非交互 SSH 也能找到 opencode
+    final launchCmd = 'export PATH="\$HOME/.bun/bin:\$HOME/.local/bin:\$HOME/go/bin:\$HOME/.npm-global/bin:/usr/local/bin:\$PATH"; '
+        'source \$HOME/.bashrc 2>/dev/null || true; '
+        'opencode serve --port ${server.opencodePort}';
+    final session = await client.execute('bash -l -c \'$launchCmd\'');
     final stdoutSubscription = session.stdout
         .cast<List<int>>()
         .transform(utf8.decoder)
