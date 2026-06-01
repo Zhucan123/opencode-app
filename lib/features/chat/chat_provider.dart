@@ -165,26 +165,21 @@ class ChatController extends StateNotifier<ChatState> {
 
     switch (event.type) {
       case OpencodeEventType.sessionUpdated:
-        // session.updated 在 AI 流式生成时携带部分消息内容，需要更新
-        final streamingMsg = event.message;
-        if (streamingMsg != null) {
-          state = state.copyWith(
-            messages: _upsertMessage(state.messages, streamingMsg),
-            isStreaming: true,
-            clearError: true,
-          );
-        } else {
-          state = state.copyWith(isStreaming: true, clearError: true);
-        }
+        // session.updated 表示 session 元数据更新（标题等），标记为流式状态
+        state = state.copyWith(isStreaming: true, clearError: true);
         return;
-      case OpencodeEventType.sessionMessage:
+      case OpencodeEventType.messageUpdated:
+        // message.updated 是实际的消息更新事件（流式 + 完成都走这里）
         final message = event.message;
         if (message == null) {
           return;
         }
+        // 如果消息已完成（assistant 角色且有 time.completed），关闭流式状态
+        final isComplete = message.role == MessageRole.assistant &&
+            event.payload['properties']?['info']?['time']?['completed'] != null;
         state = state.copyWith(
           messages: _upsertMessage(state.messages, message),
-          isStreaming: false,
+          isStreaming: !isComplete,
           isSending: false,
           clearError: true,
         );
@@ -196,8 +191,8 @@ class ChatController extends StateNotifier<ChatState> {
           error: event.error ?? 'OpenCode 返回错误事件。',
         );
         return;
-      case OpencodeEventType.toolExecution:
-      case OpencodeEventType.permissionRequested:
+      case OpencodeEventType.toolCalled:
+      case OpencodeEventType.permissionAsked:
       case OpencodeEventType.unknown:
         return;
     }
