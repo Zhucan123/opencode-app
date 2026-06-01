@@ -4,6 +4,7 @@ import 'package:code_app/features/chat/widgets/message_bubble.dart';
 import 'package:code_app/features/sessions/session_provider.dart';
 import 'package:code_app/shared/theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -72,13 +73,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 16),
                       itemBuilder: (context, index) {
                         if (state.isStreaming && index == state.messages.length) {
-                          // 检查最后一条 assistant 消息是否已有流式内容
-                          final lastMsg = state.messages.isNotEmpty ? state.messages.last : null;
-                          final hasStreamingContent = lastMsg != null &&
-                              state.streamingTextFor(lastMsg.id).isNotEmpty;
-                          if (hasStreamingContent) {
-                            // 已有内容，不显示思考泡（消息气泡已经在更新）
-                            return const SizedBox.shrink();
+                          // 收集所有正在流式输出的文本（不在消息列表里的 messageId）
+                          final existingIds = state.messages.map((m) => m.id).toSet();
+                          final pendingText = state.streamingParts.entries
+                              .where((e) => !existingIds.contains(e.key))
+                              .map((e) => e.value.values.join(''))
+                              .where((t) => t.isNotEmpty)
+                              .join('\n\n');
+
+                          if (pendingText.isNotEmpty) {
+                            // 有流式内容但还没进 REST 列表，显示为临时气泡
+                            return _StreamingBubble(text: pendingText);
                           }
                           return const _ThinkingBubble();
                         }
@@ -124,6 +129,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         curve: Curves.easeOut,
       );
     });
+  }
+}
+
+class _StreamingBubble extends StatelessWidget {
+  const _StreamingBubble({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.9,
+        ),
+        child: MarkdownBody(
+          data: text,
+          selectable: false,
+          styleSheet: MarkdownStyleSheet(
+            p: Theme.of(context).textTheme.bodyLarge,
+          ),
+        ),
+      ),
+    );
   }
 }
 

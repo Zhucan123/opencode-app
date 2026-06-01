@@ -39,12 +39,15 @@ class ChatState {
   final bool isStreaming;
   final String? error;
 
-  /// 获取某条消息的展示文本（优先用流式累积内容）
+  /// 获取某条消息的流式累积文本
   String streamingTextFor(String messageId) {
     final parts = streamingParts[messageId];
     if (parts == null || parts.isEmpty) return '';
     return parts.values.join('');
   }
+
+  /// 是否有任何流式内容
+  bool get hasStreamingContent => streamingParts.isNotEmpty;
 
   ChatState copyWith({
     List<OpencodeMessage>? messages,
@@ -79,6 +82,8 @@ class ChatController extends StateNotifier<ChatState> {
   final Ref ref;
   final ChatProviderArgs args;
   StreamSubscription<OpencodeEvent>? _subscription;
+  // 流式结束检测：最后一次事件后 3s 无新事件则自动刷新消息列表
+  Timer? _streamEndTimer;
 
   Future<void> _initialize() async {
     final connection = ref.read(activeConnectionProvider(args.serverId));
@@ -108,7 +113,13 @@ class ChatController extends StateNotifier<ChatState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final messages = await connection.apiClient.getMessages(args.sessionId);
-      state = state.copyWith(messages: messages, isLoading: false);
+      // 刷新完成后清空流式内容，因为 REST 已包含完整数据
+      state = state.copyWith(
+        messages: messages,
+        streamingParts: const {},
+        isLoading: false,
+        isStreaming: false,
+      );
     } catch (error) {
       state = state.copyWith(isLoading: false, error: error.toString());
     }
@@ -124,6 +135,7 @@ class ChatController extends StateNotifier<ChatState> {
     final trimmed = text.trim();
     if (trimmed.isEmpty || state.isSending) return;
 
+    // 乐观插入用户消息
     final optimistic = OpencodeMessage(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
       sessionId: args.sessionId,
@@ -148,58 +160,39 @@ class ChatController extends StateNotifier<ChatState> {
 
   void _handleEvent(OpencodeEvent event) {
     if (!_matchesSession(event)) return;
+    _resetStreamEndTimer();
 
     switch (event.type) {
       case OpencodeEventType.sessionUpdated:
-        // session 元数据更新，标记流式状态
+      case OpencodeEventType.messageUpdated:
+        // 只标记流式状态，不修改 messages 列表
+        // messages 列表由 REST API 维护，SSE 只做流式内容展示
         state = state.copyWith(isStreaming: true, clearError: true);
         return;
 
-      case OpencodeEventType.messageUpdated:
-        // 消息元数据更新（无 parts），upsert 到消息列表
-        final msg = event.message;
-        if (msg == null) return;
-        state = state.copyWith(
-          messages: _upsertMessage(state.messages, msg),
-          isStreaming: true,
-          clearError: true,
-        );
-        return;
-
       case OpencodeEventType.messagePartUpdated:
-        // 完整 part 对象到达（通常是 part 完成时）
         final part = event.part;
-        if (part == null || part.isSkippable) return;
-        if (part.type != 'text') return; // 暂只处理文本 part
-
+        if (part == null || part.isSkippable || part.type != 'text') return;
         final text = part.text;
-        if (text == null) return;
+        if (text == null || text.isEmpty) return;
 
-        final updated = Map<String, Map<String, String>>.from(state.streamingParts);
-        final msgParts = Map<String, String>.from(updated[part.messageId] ?? {});
-        msgParts[part.id] = text;
-        updated[part.messageId] = msgParts;
-
+        final updated = _updateStreamingPart(part.messageId, part.id, text);
         state = state.copyWith(streamingParts: updated, isStreaming: true);
         return;
 
       case OpencodeEventType.messagePartDelta:
-        // 文本增量：追加到对应 part
         final delta = event.partDelta;
         if (delta == null || delta.field != 'text' || delta.delta.isEmpty) return;
 
-        final updated = Map<String, Map<String, String>>.from(state.streamingParts);
-        final msgParts = Map<String, String>.from(updated[delta.messageId] ?? {});
-        msgParts[delta.partId] = (msgParts[delta.partId] ?? '') + delta.delta;
-        updated[delta.messageId] = msgParts;
-
+        final currentText = state.streamingParts[delta.messageId]?[delta.partId] ?? '';
+        final updated = _updateStreamingPart(
+            delta.messageId, delta.partId, currentText + delta.delta);
         state = state.copyWith(streamingParts: updated, isStreaming: true);
         return;
 
       case OpencodeEventType.messagePartRemoved:
         final partId = event.removedPartId;
         if (partId == null) return;
-        // 从所有 messageId 的 parts 里删除这个 partId
         final updated = <String, Map<String, String>>{};
         for (final entry in state.streamingParts.entries) {
           final parts = Map<String, String>.from(entry.value)..remove(partId);
@@ -209,6 +202,7 @@ class ChatController extends StateNotifier<ChatState> {
         return;
 
       case OpencodeEventType.sessionError:
+        _streamEndTimer?.cancel();
         state = state.copyWith(
           isStreaming: false,
           isSending: false,
@@ -223,10 +217,28 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
+  /// 重置流式结束计时器：最后一个事件后 3s 自动刷新消息列表
+  void _resetStreamEndTimer() {
+    _streamEndTimer?.cancel();
+    _streamEndTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        refreshMessages();
+      }
+    });
+  }
+
+  Map<String, Map<String, String>> _updateStreamingPart(
+      String messageId, String partId, String text) {
+    final updated = Map<String, Map<String, String>>.from(state.streamingParts);
+    final msgParts = Map<String, String>.from(updated[messageId] ?? {});
+    msgParts[partId] = text;
+    updated[messageId] = msgParts;
+    return updated;
+  }
+
   bool _matchesSession(OpencodeEvent event) {
     final sid = event.sessionId;
     if (sid != null && sid.isNotEmpty) return sid == args.sessionId;
-    // fallback：message.updated 事件里 message.sessionId
     return event.message?.sessionId == args.sessionId;
   }
 
@@ -254,6 +266,7 @@ class ChatController extends StateNotifier<ChatState> {
 
   @override
   void dispose() {
+    _streamEndTimer?.cancel();
     _subscription?.cancel();
     super.dispose();
   }
