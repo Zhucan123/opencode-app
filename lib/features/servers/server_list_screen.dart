@@ -17,6 +17,13 @@ class ServerListScreen extends ConsumerWidget {
       appBar: AppBar(
         centerTitle: true,
         title: const Text('OpenCode'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline_rounded),
+            onPressed: () => context.push('/help'),
+            tooltip: '使用说明',
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/servers/new'),

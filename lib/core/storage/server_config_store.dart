@@ -20,6 +20,7 @@ class ServerConfig {
     this.password = '',
     this.pemKey = '',
     this.workingDirectory = '',
+    this.opencodePath = '',
     this.lastConnected,
   });
 
@@ -33,6 +34,7 @@ class ServerConfig {
   final String password;
   final String pemKey;
   final String workingDirectory;
+  final String opencodePath; // 自定义 opencode 可执行文件路径，留空则自动查找
   final DateTime? lastConnected;
 
   String get addressLabel => '$username@$host';
@@ -54,6 +56,7 @@ class ServerConfig {
       password: password,
       pemKey: pemKey,
       workingDirectory: json['workingDirectory']?.toString() ?? '',
+      opencodePath: json['opencodePath']?.toString() ?? '',
       lastConnected: _parseDate(json['lastConnected']),
     );
   }
@@ -68,6 +71,7 @@ class ServerConfig {
       'opencodePort': opencodePort,
       'authType': authType == SshAuthType.pemKey ? 'pemKey' : 'password',
       'workingDirectory': workingDirectory,
+      'opencodePath': opencodePath,
       'lastConnected': lastConnected?.toIso8601String(),
     };
   }
@@ -83,6 +87,7 @@ class ServerConfig {
     String? password,
     String? pemKey,
     String? workingDirectory,
+    String? opencodePath,
     DateTime? lastConnected,
   }) {
     return ServerConfig(
@@ -96,6 +101,7 @@ class ServerConfig {
       password: password ?? this.password,
       pemKey: pemKey ?? this.pemKey,
       workingDirectory: workingDirectory ?? this.workingDirectory,
+      opencodePath: opencodePath ?? this.opencodePath,
       lastConnected: lastConnected ?? this.lastConnected,
     );
   }

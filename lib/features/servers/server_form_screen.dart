@@ -24,6 +24,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
   late final TextEditingController _pemKeyController;
   late final TextEditingController _opencodePortController;
   late final TextEditingController _workingDirController;
+  late final TextEditingController _opencodePathController;
   late SshAuthType _authType;
   bool _isSaving = false;
 
@@ -42,6 +43,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
     _pemKeyController = TextEditingController(text: server?.pemKey ?? '');
     _opencodePortController = TextEditingController(text: '${server?.opencodePort ?? 4096}');
     _workingDirController = TextEditingController(text: server?.workingDirectory ?? '');
+    _opencodePathController = TextEditingController(text: server?.opencodePath ?? '');
     _authType = server?.authType ?? SshAuthType.password;
   }
 
@@ -55,6 +57,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
     _pemKeyController.dispose();
     _opencodePortController.dispose();
     _workingDirController.dispose();
+    _opencodePathController.dispose();
     super.dispose();
   }
 
@@ -170,6 +173,17 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
               ),
               keyboardType: TextInputType.url,
             ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _opencodePathController,
+              decoration: const InputDecoration(
+                labelText: 'opencode 安装路径（可选）',
+                hintText: '例：/home/ubuntu/.opencode/bin/opencode',
+                prefixIcon: Icon(Icons.terminal_outlined),
+                helperText: '留空则自动从 PATH 查找',
+              ),
+              keyboardType: TextInputType.url,
+            ),
             const SizedBox(height: 32),
             FilledButton(
               onPressed: _isSaving ? null : _saveServer,
@@ -233,6 +247,7 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
         password: _authType == SshAuthType.password ? _passwordController.text : '',
         pemKey: _authType == SshAuthType.pemKey ? _pemKeyController.text.trim() : '',
         workingDirectory: _workingDirController.text.trim(),
+        opencodePath: _opencodePathController.text.trim(),
         lastConnected: widget.initialServer?.lastConnected,
       );
       await ref.read(serverListProvider.notifier).saveServer(config);

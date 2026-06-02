@@ -96,10 +96,14 @@ class OpencodeSshClient {
     final cdPart = server.workingDirectory.isNotEmpty
         ? 'cd "${server.workingDirectory}" && '
         : '';
+    // 优先使用用户指定路径，否则从 PATH 自动查找
+    final opencodeBin = server.opencodePath.isNotEmpty
+        ? '"${server.opencodePath}"'
+        : 'opencode';
     final launchCmd = 'export PATH="\$HOME/.opencode/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$HOME/go/bin:\$HOME/.npm-global/bin:/usr/local/bin:\$PATH"; '
         'source \$HOME/.bashrc 2>/dev/null || true; '
         '${cdPart}'
-        'exec opencode serve --port ${server.opencodePort}';  // exec 替换 bash 进程，SIGTERM/SIGKILL 直接打到 opencode
+        'exec $opencodeBin serve --port ${server.opencodePort}'; // exec 替换 bash 进程，SIGTERM/SIGKILL 直接打到 opencode
     final session = await client.execute('bash -l -c \'$launchCmd\'');
     final stdoutSubscription = session.stdout
         .cast<List<int>>()
