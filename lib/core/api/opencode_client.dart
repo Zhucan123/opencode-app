@@ -75,11 +75,14 @@ class OpencodeClient {
           return OpencodeMessage.fromJson(map);
         })
         .toList();
-    // 取最新的 limit 条，避免超长会话卡顿
-    if (all.length > limit) {
-      return all.sublist(all.length - limit);
+    // 只保留 user / assistant 消息，过滤 system / tool 等弹窗通知类消息
+    final visible = all
+        .where((m) => m.role == MessageRole.user || m.role == MessageRole.assistant)
+        .toList();
+    if (visible.length > limit) {
+      return visible.sublist(visible.length - limit);
     }
-    return all;
+    return visible;
   }
 
   Future<void> sendPrompt(String sessionId, String text, {String? mode}) async {
