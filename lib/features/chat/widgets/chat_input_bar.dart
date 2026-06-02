@@ -161,57 +161,67 @@ class _ModeButton extends StatelessWidget {
       ),
       builder: (context) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    '选择模式',
-                    style: Theme.of(context).textTheme.titleMedium,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              ...modes.map((mode) {
-                final isSelected = mode == selected;
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  leading: Icon(
-                    _modeIcon(mode),
-                    color: isSelected ? AppColors.accent : AppColors.textMuted,
-                    size: 20,
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '选择模式',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
-                  title: Text(
-                    mode,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: isSelected ? AppColors.accent : AppColors.textPrimary,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: modes.map((mode) {
+                      final isSelected = mode == selected;
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                        leading: Icon(
+                          _modeIcon(mode),
+                          color: isSelected ? AppColors.accent : AppColors.textMuted,
+                          size: 20,
                         ),
+                        title: Text(
+                          mode,
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                color: isSelected ? AppColors.accent : AppColors.textPrimary,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_rounded, color: AppColors.accent, size: 18)
+                            : null,
+                        onTap: () {
+                          onModeSelected?.call(mode);
+                          Navigator.pop(context);
+                        },
+                      );
+                    }).toList(),
                   ),
-                  trailing: isSelected
-                      ? const Icon(Icons.check_rounded, color: AppColors.accent, size: 18)
-                      : null,
-                  onTap: () {
-                    onModeSelected?.call(mode);
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-              const SizedBox(height: 12),
-            ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         );
       },
