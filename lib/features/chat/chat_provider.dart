@@ -101,12 +101,9 @@ class ChatController extends StateNotifier<ChatState> {
     }
 
     try {
-      final results = await Future.wait([
-        connection.apiClient.getMessages(args.sessionId),
-        connection.apiClient.getModes(),
-      ]);
-      final messages = results[0] as List<OpencodeMessage>;
-      final modes = results[1] as List<String>;
+      // 分开调用，避免 Future.wait 混合类型在运行时转换失败导致消息加载丢失
+      final messages = await connection.apiClient.getMessages(args.sessionId);
+      final modes = await connection.apiClient.getModes();
       state = state.copyWith(
         messages: messages,
         availableModes: modes,

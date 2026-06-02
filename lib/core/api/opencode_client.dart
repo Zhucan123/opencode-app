@@ -87,15 +87,15 @@ class OpencodeClient {
       'parts': [{'type': 'text', 'text': text}],
     };
     if (mode != null && mode.isNotEmpty) {
-      data['mode'] = mode;
+      data['agent'] = mode; // opencode 用 agent 字段，不是 mode
     }
     await _dio.post<void>('/session/$sessionId/prompt_async', data: data);
   }
 
-  /// 获取可用模式列表（build / plan / 自定义）
+  /// 获取可用 agent（模式）列表，对应 TUI 里的 build/plan 等
   Future<List<String>> getModes() async {
     try {
-      final response = await _dio.get<List<dynamic>>('/mode');
+      final response = await _dio.get<List<dynamic>>('/agent');
       final payload = response.data ?? const <dynamic>[];
       return payload
           .whereType<Map>()
@@ -103,7 +103,6 @@ class OpencodeClient {
           .where((name) => name.isNotEmpty)
           .toList();
     } catch (_) {
-      // 服务端不支持时返回默认列表
       return const ['build', 'plan'];
     }
   }
