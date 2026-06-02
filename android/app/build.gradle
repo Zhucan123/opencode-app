@@ -49,12 +49,15 @@ android {
 
     buildTypes {
         debug {
+            minifyEnabled false
+            shrinkResources false
             signingConfig signingConfigs.appDebug.storeFile?.exists()
                 ? signingConfigs.appDebug
                 : signingConfigs.debug
         }
         release {
             minifyEnabled false
+            shrinkResources false
             signingConfig signingConfigs.appRelease.storeFile?.exists()
                 ? signingConfigs.appRelease
                 : signingConfigs.debug
