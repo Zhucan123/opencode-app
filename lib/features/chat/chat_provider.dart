@@ -25,6 +25,8 @@ class ChatState {
   const ChatState({
     this.messages = const <OpencodeMessage>[],
     this.streamingParts = const <String, Map<String, String>>{},
+    this.availableModes = const <String>[],
+    this.selectedMode,
     this.isLoading = false,
     this.isSending = false,
     this.isStreaming = false,
@@ -32,8 +34,9 @@ class ChatState {
   });
 
   final List<OpencodeMessage> messages;
-  // messageId → { partId → accumulatedText }
   final Map<String, Map<String, String>> streamingParts;
+  final List<String> availableModes;
+  final String? selectedMode;
   final bool isLoading;
   final bool isSending;
   final bool isStreaming;
@@ -52,6 +55,9 @@ class ChatState {
   ChatState copyWith({
     List<OpencodeMessage>? messages,
     Map<String, Map<String, String>>? streamingParts,
+    List<String>? availableModes,
+    String? selectedMode,
+    bool clearSelectedMode = false,
     bool? isLoading,
     bool? isSending,
     bool? isStreaming,
@@ -61,6 +67,8 @@ class ChatState {
     return ChatState(
       messages: messages ?? this.messages,
       streamingParts: streamingParts ?? this.streamingParts,
+      availableModes: availableModes ?? this.availableModes,
+      selectedMode: clearSelectedMode ? null : (selectedMode ?? this.selectedMode),
       isLoading: isLoading ?? this.isLoading,
       isSending: isSending ?? this.isSending,
       isStreaming: isStreaming ?? this.isStreaming,
@@ -93,8 +101,19 @@ class ChatController extends StateNotifier<ChatState> {
     }
 
     try {
-      final messages = await connection.apiClient.getMessages(args.sessionId);
-      state = state.copyWith(messages: messages, isLoading: false, clearError: true);
+      final results = await Future.wait([
+        connection.apiClient.getMessages(args.sessionId),
+        connection.apiClient.getModes(),
+      ]);
+      final messages = results[0] as List<OpencodeMessage>;
+      final modes = results[1] as List<String>;
+      state = state.copyWith(
+        messages: messages,
+        availableModes: modes,
+        selectedMode: modes.isNotEmpty ? modes.first : null,
+        isLoading: false,
+        clearError: true,
+      );
 
       _subscription = connection.events.listen(
         _handleEvent,
@@ -105,6 +124,10 @@ class ChatController extends StateNotifier<ChatState> {
     } catch (error) {
       state = state.copyWith(isLoading: false, error: error.toString());
     }
+  }
+
+  void setMode(String mode) {
+    state = state.copyWith(selectedMode: mode);
   }
 
   Future<void> refreshMessages() async {
@@ -151,7 +174,11 @@ class ChatController extends StateNotifier<ChatState> {
     );
 
     try {
-      await connection.apiClient.sendPrompt(args.sessionId, trimmed);
+      await connection.apiClient.sendPrompt(
+        args.sessionId,
+        trimmed,
+        mode: state.selectedMode,
+      );
       state = state.copyWith(isSending: false, isStreaming: true);
     } catch (error) {
       state = state.copyWith(isSending: false, isStreaming: false, error: error.toString());

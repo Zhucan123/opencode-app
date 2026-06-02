@@ -82,18 +82,30 @@ class OpencodeClient {
     return all;
   }
 
-  Future<void> sendPrompt(String sessionId, String text) async {
-    await _dio.post<void>(
-      '/session/$sessionId/prompt_async',
-      data: {
-        'parts': [
-          {
-            'type': 'text',
-            'text': text,
-          },
-        ],
-      },
-    );
+  Future<void> sendPrompt(String sessionId, String text, {String? mode}) async {
+    final data = <String, dynamic>{
+      'parts': [{'type': 'text', 'text': text}],
+    };
+    if (mode != null && mode.isNotEmpty) {
+      data['mode'] = mode;
+    }
+    await _dio.post<void>('/session/$sessionId/prompt_async', data: data);
+  }
+
+  /// 获取可用模式列表（build / plan / 自定义）
+  Future<List<String>> getModes() async {
+    try {
+      final response = await _dio.get<List<dynamic>>('/mode');
+      final payload = response.data ?? const <dynamic>[];
+      return payload
+          .whereType<Map>()
+          .map((m) => m['name']?.toString() ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
+    } catch (_) {
+      // 服务端不支持时返回默认列表
+      return const ['build', 'plan'];
+    }
   }
 
   Future<void> abort(String sessionId) async {
