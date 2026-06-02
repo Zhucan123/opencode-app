@@ -57,10 +57,11 @@ class OpencodeClient {
     await _dio.delete<void>('/session/$sessionId');
   }
 
-  Future<List<OpencodeMessage>> getMessages(String sessionId) async {
+  /// 加载历史消息，最多返回 [limit] 条（取最新的）
+  Future<List<OpencodeMessage>> getMessages(String sessionId, {int limit = 50}) async {
     final response = await _dio.get<List<dynamic>>('/session/$sessionId/message');
     final payload = response.data ?? const <dynamic>[];
-    return payload
+    final all = payload
         .whereType<Map>()
         .map((item) {
           final map = Map<String, dynamic>.from(item);
@@ -74,6 +75,11 @@ class OpencodeClient {
           return OpencodeMessage.fromJson(map);
         })
         .toList();
+    // 取最新的 limit 条，避免超长会话卡顿
+    if (all.length > limit) {
+      return all.sublist(all.length - limit);
+    }
+    return all;
   }
 
   Future<void> sendPrompt(String sessionId, String text) async {
