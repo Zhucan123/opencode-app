@@ -91,8 +91,11 @@ class OpencodeClient {
       'parts': [{'type': 'text', 'text': text}],
     };
     if (mode != null && mode.isNotEmpty) data['agent'] = mode;
-    if (modelId != null && modelId.isNotEmpty) data['modelID'] = modelId;
-    if (providerId != null && providerId.isNotEmpty) data['providerID'] = providerId;
+    // model 必须嵌套在 model 对象里，不能放顶层
+    if (modelId != null && modelId.isNotEmpty &&
+        providerId != null && providerId.isNotEmpty) {
+      data['model'] = {'modelID': modelId, 'providerID': providerId};
+    }
     await _dio.post<void>('/session/$sessionId/prompt_async', data: data);
   }
 
