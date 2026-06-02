@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>隐私政策 - OpenCode Mobile</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d0d0d; color: #eee;
+      line-height: 1.7; padding: 0 16px;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 48px 0 80px; }
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .updated { color: #888; font-size: 14px; margin-bottom: 40px; }
+    h2 { font-size: 18px; font-weight: 600; margin: 36px 0 12px;
+         color: #6b7ae8; }
+    p { color: #ccc; margin-bottom: 12px; }
+    ul { color: #ccc; padding-left: 20px; margin-bottom: 12px; }
+    ul li { margin-bottom: 6px; }
+    .highlight {
+      background: #1e1e1e; border: 1px solid #2e2e2e;
+      border-radius: 8px; padding: 16px 20px; margin: 16px 0;
+      color: #eee;
+    }
+    a { color: #6b7ae8; text-decoration: none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>隐私政策</h1>
+  <p class="updated">最后更新：2026 年 6 月</p>
+
+  <div class="highlight">
+    <strong>核心承诺：</strong>OpenCode Mobile 不收集、不上传、不共享你的任何个人数据。
+    所有信息仅存储在你的设备本地。
+  </div>
+
+  <h2>1. 我们收集什么信息</h2>
+  <p>OpenCode Mobile 仅在你的设备本地存储以下信息，<strong>不会上传到任何服务器</strong>：</p>
+  <ul>
+    <li>服务器连接配置（主机地址、端口、用户名）</li>
+    <li>SSH 认证凭据（密码或 PEM 私钥）——使用系统级加密存储（Android Keystore）</li>
+    <li>工作目录路径偏好设置</li>
+  </ul>
+
+  <h2>2. 我们不收集什么</h2>
+  <ul>
+    <li>不收集设备标识符、位置信息或个人身份信息</li>
+    <li>不收集 AI 对话内容</li>
+    <li>不收集使用统计或崩溃报告</li>
+    <li>不使用任何第三方分析 SDK</li>
+  </ul>
+
+  <h2>3. 数据如何存储</h2>
+  <p>
+    SSH 密码和私钥使用 Android Keystore（硬件级安全存储）加密保存，
+    其他配置使用系统加密存储，均无法被其他 App 读取。
+  </p>
+
+  <h2>4. 网络连接</h2>
+  <p>
+    App 仅通过 SSH 协议连接到<strong>你自己配置的服务器</strong>，
+    不连接任何第三方服务或云服务器。AI 对话直接在你的服务器上处理，
+    不经过我们的任何中间服务。
+  </p>
+
+  <h2>5. 数据删除</h2>
+  <p>
+    卸载 App 即可删除所有本地存储的数据。
+    你也可以在 App 内删除各服务器配置，相关凭据会立即从设备中清除。
+  </p>
+
+  <h2>6. 儿童隐私</h2>
+  <p>本 App 面向开发者，不面向 13 岁以下未成年人。</p>
+
+  <h2>7. 政策变更</h2>
+  <p>
+    如我们更新隐私政策，将在此页面更新日期并通知用户。
+    继续使用即表示同意更新后的政策。
+  </p>
+
+  <h2>8. 联系我们</h2>
+  <p>如有隐私相关问题，请通过 GitHub Issues 联系：
+    <a href="https://github.com/Zhucan123/opencode-app/issues" target="_blank">
+      github.com/Zhucan123/opencode-app/issues
+    </a>
+  </p>
+</div>
+</body>
+</html>
