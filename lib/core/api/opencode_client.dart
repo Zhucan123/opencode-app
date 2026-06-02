@@ -85,28 +85,49 @@ class OpencodeClient {
     return visible;
   }
 
-  Future<void> sendPrompt(String sessionId, String text, {String? mode}) async {
+  Future<void> sendPrompt(String sessionId, String text,
+      {String? mode, String? modelId, String? providerId}) async {
     final data = <String, dynamic>{
       'parts': [{'type': 'text', 'text': text}],
     };
-    if (mode != null && mode.isNotEmpty) {
-      data['agent'] = mode; // opencode 用 agent 字段，不是 mode
-    }
+    if (mode != null && mode.isNotEmpty) data['agent'] = mode;
+    if (modelId != null && modelId.isNotEmpty) data['modelID'] = modelId;
+    if (providerId != null && providerId.isNotEmpty) data['providerID'] = providerId;
     await _dio.post<void>('/session/$sessionId/prompt_async', data: data);
   }
 
-  /// 获取可用 agent（模式）列表，对应 TUI 里的 build/plan 等
+  /// 获取可用主模式列表（过滤掉 subagent，只保留 primary/all）
   Future<List<String>> getModes() async {
     try {
       final response = await _dio.get<List<dynamic>>('/agent');
       final payload = response.data ?? const <dynamic>[];
       return payload
           .whereType<Map>()
+          .where((m) {
+            final mode = m['mode']?.toString() ?? '';
+            // 只展示 primary 和 all，过滤掉 subagent（explore/oracle 等）
+            return mode == 'primary' || mode == 'all';
+          })
           .map((m) => m['name']?.toString() ?? '')
           .where((name) => name.isNotEmpty)
           .toList();
     } catch (_) {
       return const ['build', 'plan'];
+    }
+  }
+
+  /// 获取可用模型列表
+  Future<List<OpencodeModel>> getModels() async {
+    try {
+      final response = await _dio.get<List<dynamic>>('/api/model');
+      final payload = response.data ?? const <dynamic>[];
+      return payload
+          .whereType<Map>()
+          .map((m) => OpencodeModel.fromJson(Map<String, dynamic>.from(m)))
+          .where((m) => m.enabled)
+          .toList();
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -116,5 +137,30 @@ class OpencodeClient {
 
   void dispose() {
     _dio.close(force: true);
+  }
+}
+
+class OpencodeModel {
+  const OpencodeModel({
+    required this.id,
+    required this.name,
+    required this.providerId,
+    required this.enabled,
+  });
+
+  final String id;
+  final String name;
+  final String providerId;
+  final bool enabled;
+
+  String get displayName => name.isNotEmpty ? name : id;
+
+  factory OpencodeModel.fromJson(Map<String, dynamic> json) {
+    return OpencodeModel(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      providerId: json['providerID']?.toString() ?? '',
+      enabled: json['enabled'] as bool? ?? true,
+    );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:code_app/core/api/opencode_client.dart';
 import 'package:code_app/shared/theme.dart';
 import 'package:flutter/material.dart';
 
@@ -9,6 +10,9 @@ class ChatInputBar extends StatefulWidget {
     this.availableModes = const [],
     this.selectedMode,
     this.onModeSelected,
+    this.availableModels = const [],
+    this.selectedModel,
+    this.onModelSelected,
   });
 
   final Future<void> Function(String text) onSend;
@@ -16,6 +20,9 @@ class ChatInputBar extends StatefulWidget {
   final List<String> availableModes;
   final String? selectedMode;
   final ValueChanged<String>? onModeSelected;
+  final List<OpencodeModel> availableModels;
+  final OpencodeModel? selectedModel;
+  final ValueChanged<OpencodeModel>? onModelSelected;
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
@@ -50,12 +57,25 @@ class _ChatInputBarState extends State<ChatInputBar> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 模式选择行（仅有模式时显示）
-            if (widget.availableModes.isNotEmpty) ...[
-              _ModeButton(
-                selected: widget.selectedMode,
-                modes: widget.availableModes,
-                onModeSelected: widget.onModeSelected,
+            // 模式 + 模型选择行
+            if (widget.availableModes.isNotEmpty || widget.availableModels.isNotEmpty) ...[
+              Row(
+                children: [
+                  if (widget.availableModes.isNotEmpty)
+                    _ModeButton(
+                      selected: widget.selectedMode,
+                      modes: widget.availableModes,
+                      onModeSelected: widget.onModeSelected,
+                    ),
+                  if (widget.availableModes.isNotEmpty && widget.availableModels.isNotEmpty)
+                    const SizedBox(width: 8),
+                  if (widget.availableModels.isNotEmpty)
+                    _ModelButton(
+                      selected: widget.selectedModel,
+                      models: widget.availableModels,
+                      onModelSelected: widget.onModelSelected,
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
             ],
@@ -248,5 +268,159 @@ class _ModeButton extends StatelessWidget {
       'plan' => Icons.map_outlined,
       _ => Icons.smart_toy_outlined,
     };
+  }
+}
+
+class _ModelButton extends StatelessWidget {
+  const _ModelButton({
+    required this.selected,
+    required this.models,
+    this.onModelSelected,
+  });
+
+  final OpencodeModel? selected;
+  final List<OpencodeModel> models;
+  final ValueChanged<OpencodeModel>? onModelSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = selected?.displayName ?? '默认模型';
+    // 截断太长的模型名
+    final short = label.length > 20 ? '${label.substring(0, 18)}…' : label;
+    return GestureDetector(
+      onTap: () => _showModelSheet(context),
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.auto_awesome_outlined,
+                size: 12, color: AppColors.textMuted),
+            const SizedBox(width: 4),
+            Text(
+              short,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                  ),
+            ),
+            const SizedBox(width: 3),
+            const Icon(Icons.expand_more_rounded,
+                size: 13, color: AppColors.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showModelSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.card,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          minChildSize: 0.3,
+          builder: (context, scrollController) {
+            // 按 provider 分组
+            final grouped = <String, List<OpencodeModel>>{};
+            for (final m in models) {
+              grouped.putIfAbsent(m.providerId, () => []).add(m);
+            }
+            return Column(
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('选择模型',
+                        style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    children: [
+                      for (final entry in grouped.entries) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                          child: Text(
+                            entry.key.toUpperCase(),
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: AppColors.textMuted,
+                                  letterSpacing: 1,
+                                ),
+                          ),
+                        ),
+                        ...entry.value.map((model) {
+                          final isSelected = model.id == selected?.id;
+                          return ListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 20),
+                            title: Text(
+                              model.displayName,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: isSelected
+                                        ? AppColors.accent
+                                        : AppColors.textPrimary,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                            ),
+                            subtitle: Text(
+                              model.id,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(fontSize: 11),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_rounded,
+                                    color: AppColors.accent, size: 18)
+                                : null,
+                            onTap: () {
+                              onModelSelected?.call(model);
+                              Navigator.pop(context);
+                            },
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }

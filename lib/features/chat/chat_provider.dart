@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:code_app/core/api/models/event.dart';
 import 'package:code_app/core/api/models/message.dart';
+import 'package:code_app/core/api/opencode_client.dart';
 import 'package:code_app/features/connection/connection_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,6 +28,8 @@ class ChatState {
     this.streamingParts = const <String, Map<String, String>>{},
     this.availableModes = const <String>[],
     this.selectedMode,
+    this.availableModels = const <OpencodeModel>[],
+    this.selectedModel,
     this.isLoading = false,
     this.isSending = false,
     this.isStreaming = false,
@@ -37,6 +40,8 @@ class ChatState {
   final Map<String, Map<String, String>> streamingParts;
   final List<String> availableModes;
   final String? selectedMode;
+  final List<OpencodeModel> availableModels;
+  final OpencodeModel? selectedModel;
   final bool isLoading;
   final bool isSending;
   final bool isStreaming;
@@ -58,6 +63,9 @@ class ChatState {
     List<String>? availableModes,
     String? selectedMode,
     bool clearSelectedMode = false,
+    List<OpencodeModel>? availableModels,
+    OpencodeModel? selectedModel,
+    bool clearSelectedModel = false,
     bool? isLoading,
     bool? isSending,
     bool? isStreaming,
@@ -69,6 +77,8 @@ class ChatState {
       streamingParts: streamingParts ?? this.streamingParts,
       availableModes: availableModes ?? this.availableModes,
       selectedMode: clearSelectedMode ? null : (selectedMode ?? this.selectedMode),
+      availableModels: availableModels ?? this.availableModels,
+      selectedModel: clearSelectedModel ? null : (selectedModel ?? this.selectedModel),
       isLoading: isLoading ?? this.isLoading,
       isSending: isSending ?? this.isSending,
       isStreaming: isStreaming ?? this.isStreaming,
@@ -104,10 +114,12 @@ class ChatController extends StateNotifier<ChatState> {
       // 分开调用，避免 Future.wait 混合类型在运行时转换失败导致消息加载丢失
       final messages = await connection.apiClient.getMessages(args.sessionId);
       final modes = await connection.apiClient.getModes();
+      final models = await connection.apiClient.getModels();
       state = state.copyWith(
         messages: messages,
         availableModes: modes,
         selectedMode: modes.isNotEmpty ? modes.first : null,
+        availableModels: models,
         isLoading: false,
         clearError: true,
       );
@@ -125,6 +137,10 @@ class ChatController extends StateNotifier<ChatState> {
 
   void setMode(String mode) {
     state = state.copyWith(selectedMode: mode);
+  }
+
+  void setModel(OpencodeModel model) {
+    state = state.copyWith(selectedModel: model);
   }
 
   Future<void> refreshMessages() async {
@@ -175,6 +191,8 @@ class ChatController extends StateNotifier<ChatState> {
         args.sessionId,
         trimmed,
         mode: state.selectedMode,
+        modelId: state.selectedModel?.id,
+        providerId: state.selectedModel?.providerId,
       );
       state = state.copyWith(isSending: false, isStreaming: true);
     } catch (error) {
