@@ -28,6 +28,15 @@ android {
                 keyPassword 'android123'
             }
         }
+        appRelease {
+            def releaseKeystore = file("release.keystore")
+            if (releaseKeystore.exists()) {
+                storeFile releaseKeystore
+                storePassword System.getenv("RELEASE_STORE_PASSWORD") ?: ''
+                keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: ''
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: ''
+            }
+        }
     }
 
     defaultConfig {
@@ -45,8 +54,9 @@ android {
                 : signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.appDebug.storeFile?.exists()
-                ? signingConfigs.appDebug
+            minifyEnabled false
+            signingConfig signingConfigs.appRelease.storeFile?.exists()
+                ? signingConfigs.appRelease
                 : signingConfigs.debug
         }
     }

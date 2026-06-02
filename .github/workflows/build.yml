@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build Debug APK
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
@@ -22,11 +22,36 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Setup keystore
+      - name: Setup debug keystore
         run: |
-          KEYSTORE_PATH="${{ github.workspace }}/android/app/debug.keystore"
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
-          echo "Keystore restored from secret"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > \
+            "${{ github.workspace }}/android/app/debug.keystore"
+
+      - name: Setup release keystore
+        run: |
+          KEYSTORE_PATH="${{ github.workspace }}/android/app/release.keystore"
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
+            echo "Release keystore restored"
+          else
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -alias opencode-app \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "release_placeholder" \
+              -keypass "release_placeholder" \
+              -dname "CN=OpenCode App, OU=Dev, O=OpenCode, L=Shanghai, ST=Shanghai, C=CN"
+            base64 -w 0 "$KEYSTORE_PATH" > /tmp/release_keystore.b64
+            echo "Generated new keystore - save artifact as RELEASE_KEYSTORE_BASE64 secret"
+          fi
+
+      - name: Upload release keystore (first time setup)
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-keystore-base64
+          path: /tmp/release_keystore.b64
+          retention-days: 7
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -44,9 +69,25 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
-      - name: Upload APK
+      - name: Build release APK
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' && secrets.RELEASE_STORE_PASSWORD != '' }}
+        env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: flutter build apk --release
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 30
+
+      - name: Upload release APK
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' && secrets.RELEASE_STORE_PASSWORD != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 90
