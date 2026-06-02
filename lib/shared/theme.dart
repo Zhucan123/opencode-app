@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
   static const background = Color(0xFF0A0A0A);
@@ -28,7 +29,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
-      fontFamily: 'sans-serif',
+      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
       visualDensity: VisualDensity.adaptivePlatformDensity,
     );
 
@@ -80,12 +81,12 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.accent),
         ),
       ),
-      textTheme: base.textTheme.apply(
+      textTheme: GoogleFonts.interTextTheme(base.textTheme).apply(
         bodyColor: AppColors.textPrimary,
         displayColor: AppColors.textPrimary,
       ).copyWith(
-        bodySmall: const TextStyle(color: AppColors.textMuted),
-        labelSmall: const TextStyle(color: AppColors.textMuted),
+        bodySmall: GoogleFonts.inter(color: AppColors.textMuted),
+        labelSmall: GoogleFonts.inter(color: AppColors.textMuted),
       ),
       listTileTheme: const ListTileThemeData(
         iconColor: AppColors.textPrimary,

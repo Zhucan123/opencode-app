@@ -41,60 +41,64 @@ class _ChatInputBarState extends State<ChatInputBar> {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         decoration: const BoxDecoration(
           color: AppColors.background,
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.availableModes.isNotEmpty)
+            // 模式选择行（仅有模式时显示）
+            if (widget.availableModes.isNotEmpty) ...[
               _ModeButton(
                 selected: widget.selectedMode,
                 modes: widget.availableModes,
                 onModeSelected: widget.onModeSelected,
-              )
-            else
-              IconButton(
-                onPressed: null,
-                icon: const Icon(Icons.attach_file_rounded),
-                color: AppColors.textMuted,
-                disabledColor: AppColors.textMuted,
               ),
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                enabled: !widget.isBusy,
-                minLines: 1,
-                maxLines: 6,
-                textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  hintText: 'Message OpenCode...',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              const SizedBox(height: 8),
+            ],
+            // 输入行：全宽输入框 + 发送按钮
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    enabled: !widget.isBusy,
+                    minLines: 1,
+                    maxLines: 6,
+                    textInputAction: TextInputAction.newline,
+                    decoration: const InputDecoration(
+                      hintText: 'Message OpenCode...',
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 44,
-              height: 44,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  shape: const CircleBorder(),
-                  backgroundColor: AppColors.textPrimary,
-                  foregroundColor: AppColors.background,
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      shape: const CircleBorder(),
+                      backgroundColor: AppColors.textPrimary,
+                      foregroundColor: AppColors.background,
+                    ),
+                    onPressed: widget.isBusy ? null : _handleSend,
+                    child: widget.isBusy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.arrow_upward_rounded, size: 18),
+                  ),
                 ),
-                onPressed: widget.isBusy ? null : _handleSend,
-                child: widget.isBusy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.arrow_upward_rounded, size: 18),
-              ),
+              ],
             ),
           ],
         ),
@@ -126,12 +130,11 @@ class _ModeButton extends StatelessWidget {
     return GestureDetector(
       onTap: () => _showModeSheet(context),
       child: Container(
-        height: 36,
+        height: 28,
         padding: const EdgeInsets.symmetric(horizontal: 10),
-        margin: const EdgeInsets.only(bottom: 4, right: 4),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
@@ -139,13 +142,15 @@ class _ModeButton extends StatelessWidget {
           children: [
             Text(
               selected ?? 'build',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: AppColors.accent,
                     fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
             ),
-            const SizedBox(width: 4),
-            const Icon(Icons.expand_more_rounded, size: 14, color: AppColors.textMuted),
+            const SizedBox(width: 3),
+            const Icon(Icons.expand_more_rounded,
+                size: 13, color: AppColors.textMuted),
           ],
         ),
       ),
@@ -195,21 +200,30 @@ class _ModeButton extends StatelessWidget {
                     children: modes.map((mode) {
                       final isSelected = mode == selected;
                       return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 20),
                         leading: Icon(
                           _modeIcon(mode),
-                          color: isSelected ? AppColors.accent : AppColors.textMuted,
+                          color: isSelected
+                              ? AppColors.accent
+                              : AppColors.textMuted,
                           size: 20,
                         ),
                         title: Text(
                           mode,
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: isSelected ? AppColors.accent : AppColors.textPrimary,
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: isSelected
+                                        ? AppColors.accent
+                                        : AppColors.textPrimary,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
                         ),
                         trailing: isSelected
-                            ? const Icon(Icons.check_rounded, color: AppColors.accent, size: 18)
+                            ? const Icon(Icons.check_rounded,
+                                color: AppColors.accent, size: 18)
                             : null,
                         onTap: () {
                           onModeSelected?.call(mode);
