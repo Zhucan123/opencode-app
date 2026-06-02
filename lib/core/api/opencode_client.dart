@@ -116,19 +116,24 @@ class OpencodeClient {
     }
   }
 
-  /// 获取可用模型列表
+  /// 获取可用模型列表（尝试新旧两个路径）
   Future<List<OpencodeModel>> getModels() async {
-    try {
-      final response = await _dio.get<List<dynamic>>('/api/model');
-      final payload = response.data ?? const <dynamic>[];
-      return payload
-          .whereType<Map>()
-          .map((m) => OpencodeModel.fromJson(Map<String, dynamic>.from(m)))
-          .where((m) => m.enabled)
-          .toList();
-    } catch (_) {
-      return const [];
+    for (final path in ['/api/model', '/model']) {
+      try {
+        final response = await _dio.get<List<dynamic>>(path);
+        final payload = response.data ?? const <dynamic>[];
+        if (payload.isEmpty) continue;
+        final models = payload
+            .whereType<Map>()
+            .map((m) => OpencodeModel.fromJson(Map<String, dynamic>.from(m)))
+            .where((m) => m.enabled && m.id.isNotEmpty)
+            .toList();
+        if (models.isNotEmpty) return models;
+      } catch (_) {
+        continue;
+      }
     }
+    return const [];
   }
 
   Future<void> abort(String sessionId) async {
