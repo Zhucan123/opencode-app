@@ -96,7 +96,7 @@ class OpencodeClient {
     await _dio.post<void>('/session/$sessionId/prompt_async', data: data);
   }
 
-  /// 获取可用主模式列表（过滤掉 subagent，只保留 primary/all）
+  /// 获取可用主模式列表（过滤掉 subagent 和 hidden agent）
   Future<List<String>> getModes() async {
     try {
       final response = await _dio.get<List<dynamic>>('/agent');
@@ -105,8 +105,9 @@ class OpencodeClient {
           .whereType<Map>()
           .where((m) {
             final mode = m['mode']?.toString() ?? '';
-            // 只展示 primary 和 all，过滤掉 subagent（explore/oracle 等）
-            return mode == 'primary' || mode == 'all';
+            final hidden = m['hidden'] as bool? ?? false;
+            // 只展示 primary/all 且非隐藏的 agent
+            return (mode == 'primary' || mode == 'all') && !hidden;
           })
           .map((m) => m['name']?.toString() ?? '')
           .where((name) => name.isNotEmpty)
