@@ -97,14 +97,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
             ),
           ),
-          if (state.availableModes.isNotEmpty)
-            _ModeSelectorBar(
-              modes: state.availableModes,
-              selected: state.selectedMode,
-              onSelect: (mode) => ref.read(chatProvider(args).notifier).setMode(mode),
-            ),
           ChatInputBar(
             isBusy: state.isSending,
+            availableModes: state.availableModes,
+            selectedMode: state.selectedMode,
+            onModeSelected: (mode) => ref.read(chatProvider(args).notifier).setMode(mode),
             onSend: (text) => ref.read(chatProvider(args).notifier).sendMessage(text),
           ),
         ],
@@ -199,55 +196,3 @@ class _ThinkingBubble extends StatelessWidget {
   }
 }
 
-class _ModeSelectorBar extends StatelessWidget {
-  const _ModeSelectorBar({
-    required this.modes,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final List<String> modes;
-  final String? selected;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: modes.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final mode = modes[index];
-          final isSelected = mode == selected;
-          return GestureDetector(
-            onTap: () => onSelect(mode),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.accent : AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected ? AppColors.accent : AppColors.border,
-                ),
-              ),
-              child: Text(
-                mode,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: isSelected ? Colors.white : AppColors.textMuted,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
