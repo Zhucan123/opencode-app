@@ -21,6 +21,7 @@ dependencies:
   diff_match_patch: ^0.4.1
   uuid: ^4.3.0
   json_annotation: ^4.8.1
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:

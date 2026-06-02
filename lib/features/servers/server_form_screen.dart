@@ -1,5 +1,6 @@
 import 'package:code_app/core/storage/server_config_store.dart';
 import 'package:code_app/features/servers/server_provider.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -130,16 +131,27 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
                 validator: _authType == SshAuthType.password ? _requiredValidator : null,
               )
             else
-              TextFormField(
-                controller: _pemKeyController,
-                decoration: const InputDecoration(
-                  labelText: 'PEM 私钥内容',
-                  hintText: '-----BEGIN RSA PRIVATE KEY-----\n...',
-                  alignLabelWithHint: true,
-                ),
-                maxLines: 6,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                validator: _authType == SshAuthType.pemKey ? _requiredValidator : null,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: _pemKeyController,
+                    decoration: const InputDecoration(
+                      labelText: 'PEM 私钥内容',
+                      hintText: '-----BEGIN RSA PRIVATE KEY-----\n...',
+                      alignLabelWithHint: true,
+                    ),
+                    maxLines: 6,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                    validator: _authType == SshAuthType.pemKey ? _requiredValidator : null,
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _pickPemFile,
+                    icon: const Icon(Icons.file_open_outlined, size: 18),
+                    label: const Text('从文件选择 .pem'),
+                  ),
+                ],
               ),
             const SizedBox(height: 16),
             TextFormField(
@@ -173,6 +185,26 @@ class _ServerFormScreenState extends ConsumerState<ServerFormScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickPemFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      allowMultiple: false,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+    final content = String.fromCharCodes(bytes).trim();
+    if (!content.contains('-----BEGIN') && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('所选文件不是有效的 PEM 格式')),
+      );
+      return;
+    }
+    _pemKeyController.text = content;
   }
 
   String? _requiredValidator(String? value) {
