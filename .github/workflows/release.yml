@@ -1,0 +1,120 @@
+name: Publish Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+
+    env:
+      HAS_RELEASE_SIGNING: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' && secrets.RELEASE_STORE_PASSWORD != '' && secrets.RELEASE_KEY_ALIAS != '' && secrets.RELEASE_KEY_PASSWORD != '' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup debug keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > \
+            "${{ github.workspace }}/android/app/debug.keystore" || true
+
+      - name: Setup release keystore
+        run: |
+          KEYSTORE_PATH="${{ github.workspace }}/android/app/release.keystore"
+          RELEASE_ALIAS="${{ secrets.RELEASE_KEY_ALIAS }}"
+          if [ -z "$RELEASE_ALIAS" ]; then
+            RELEASE_ALIAS="opencode-app"
+          fi
+          RELEASE_STORE_PASS="${{ secrets.RELEASE_STORE_PASSWORD }}"
+          RELEASE_KEY_PASS="${{ secrets.RELEASE_KEY_PASSWORD }}"
+          if [ -z "$RELEASE_STORE_PASS" ]; then
+            RELEASE_STORE_PASS="release_placeholder"
+          fi
+          if [ -z "$RELEASE_KEY_PASS" ]; then
+            RELEASE_KEY_PASS="$RELEASE_STORE_PASS"
+          fi
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
+            echo "Release keystore restored"
+          else
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -alias "$RELEASE_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$RELEASE_STORE_PASS" \
+              -keypass "$RELEASE_KEY_PASS" \
+              -dname "CN=OpenCode App, OU=Dev, O=OpenCode, L=Shanghai, ST=Shanghai, C=CN"
+          fi
+
+      - name: Validate release signing config
+        if: env.HAS_RELEASE_SIGNING == 'true'
+        env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          KEYSTORE_PATH="${{ github.workspace }}/android/app/release.keystore"
+          if keytool -list -v \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$RELEASE_STORE_PASSWORD" \
+            -alias "$RELEASE_KEY_ALIAS" >/dev/null 2>&1; then
+            echo "RELEASE_SIGNING_VALID=true" >> $GITHUB_ENV
+            echo "Release signing config is valid"
+          else
+            echo "RELEASE_SIGNING_VALID=false" >> $GITHUB_ENV
+            echo "::warning::Release keystore and secrets do not match."
+          fi
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.0"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+        
+      - name: Rename debug APK
+        run: mv build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/opencode-app-debug-${{ github.ref_name }}.apk
+
+      - name: Build release APK
+        if: env.HAS_RELEASE_SIGNING == 'true' && env.RELEASE_SIGNING_VALID == 'true'
+        env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: flutter build apk --release
+
+      - name: Rename release APK
+        if: env.HAS_RELEASE_SIGNING == 'true' && env.RELEASE_SIGNING_VALID == 'true'
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/opencode-app-release-${{ github.ref_name }}.apk
+
+      - name: Create Release and Upload APKs
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            build/app/outputs/flutter-apk/opencode-app-*-${{ github.ref_name }}.apk
