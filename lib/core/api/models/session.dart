@@ -6,6 +6,7 @@ class OpencodeSession {
     this.createdAt,
     this.updatedAt,
     this.preview,
+    this.state,
   });
 
   final String id;
@@ -14,6 +15,7 @@ class OpencodeSession {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? preview;
+  final String? state;
 
   bool get isSubAgent => parentId != null && parentId!.isNotEmpty;
 
@@ -29,6 +31,7 @@ class OpencodeSession {
       preview: json['preview']?.toString() ??
           json['lastMessagePreview']?.toString() ??
           json['last_message_preview']?.toString(),
+      state: json['state']?.toString(),
     );
   }
 
@@ -39,6 +42,7 @@ class OpencodeSession {
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'preview': preview,
+      'state': state,
     };
   }
 
