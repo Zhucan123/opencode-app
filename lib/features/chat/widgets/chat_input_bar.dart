@@ -6,6 +6,7 @@ class ChatInputBar extends StatefulWidget {
   const ChatInputBar({
     super.key,
     required this.onSend,
+    this.onAbort,
     this.isBusy = false,
     this.availableModes = const [],
     this.selectedMode,
@@ -16,6 +17,7 @@ class ChatInputBar extends StatefulWidget {
   });
 
   final Future<void> Function(String text) onSend;
+  final VoidCallback? onAbort;
   final bool isBusy;
   final List<String> availableModes;
   final String? selectedMode;
@@ -107,16 +109,12 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     style: FilledButton.styleFrom(
                       padding: EdgeInsets.zero,
                       shape: const CircleBorder(),
-                      backgroundColor: AppColors.textPrimary,
+                      backgroundColor: widget.isBusy ? AppColors.error : AppColors.textPrimary,
                       foregroundColor: AppColors.background,
                     ),
-                    onPressed: widget.isBusy ? null : _handleSend,
+                    onPressed: widget.isBusy ? widget.onAbort : _handleSend,
                     child: widget.isBusy
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                        ? const Icon(Icons.stop_rounded, size: 24)
                         : const Icon(Icons.arrow_upward_rounded, size: 18),
                   ),
                 ),

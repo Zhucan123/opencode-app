@@ -140,8 +140,20 @@ class OpencodeClient {
     return const [];
   }
 
+  Future<void> respondToPermission(String sessionId, String permissionId, bool allow, {bool permanent = false}) async {
+    final decision = allow ? 'allow' : 'deny';
+    await _dio.post<void>(
+      '/session/$sessionId/permissions/$permissionId',
+      data: {'decision': decision, 'permanent': permanent},
+    );
+  }
+
   Future<void> abort(String sessionId) async {
     await _dio.post<void>('/session/$sessionId/abort');
+  }
+
+  Future<void> revert(String sessionId) async {
+    await _dio.post<void>('/session/$sessionId/revert');
   }
 
   void dispose() {

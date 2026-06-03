@@ -101,7 +101,9 @@ class OpencodeSshClient {
         ? '"${server.opencodePath}"'
         : 'opencode';
     final launchCmd = 'export PATH="\$HOME/.opencode/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$HOME/go/bin:\$HOME/.npm-global/bin:/usr/local/bin:\$PATH"; '
-        'source \$HOME/.bashrc 2>/dev/null || true; '
+        'if [ -f "\$HOME/.bash_profile" ]; then source "\$HOME/.bash_profile"; fi; '
+        'if [ -f "\$HOME/.bashrc" ]; then source "\$HOME/.bashrc"; fi; '
+        'if [ -f "\$HOME/.zshrc" ]; then source "\$HOME/.zshrc" 2>/dev/null || true; fi; '
         '${cdPart}'
         'exec $opencodeBin serve --port ${server.opencodePort}'; // exec 替换 bash 进程，SIGTERM/SIGKILL 直接打到 opencode
     final session = await client.execute('bash -l -c \'$launchCmd\'');

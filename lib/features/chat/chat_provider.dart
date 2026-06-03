@@ -35,6 +35,7 @@ class ChatState {
     this.isStreaming = false,
     this.processingLabel,
     this.error,
+    this.pendingPermission,
   });
 
   final List<OpencodeMessage> messages;
@@ -48,6 +49,7 @@ class ChatState {
   final bool isStreaming;
   final String? processingLabel;
   final String? error;
+  final OpencodeEvent? pendingPermission;
 
   /// 获取某条消息的流式累积文本
   String streamingTextFor(String messageId) {
@@ -75,6 +77,8 @@ class ChatState {
     bool clearProcessingLabel = false,
     String? error,
     bool clearError = false,
+    OpencodeEvent? pendingPermission,
+    bool clearPendingPermission = false,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
@@ -90,6 +94,9 @@ class ChatState {
             ? null
             : (processingLabel ?? this.processingLabel),
         error: clearError ? null : (error ?? this.error),
+        pendingPermission: clearPendingPermission
+            ? null
+            : (pendingPermission ?? this.pendingPermission),
       );
   }
 }
@@ -221,6 +228,52 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
+  Future<void> respondToPermission(bool allow, {bool permanent = false}) async {
+    final permissionId = state.pendingPermission?.permissionId;
+    if (permissionId == null) return;
+
+    final connection = ref.read(activeConnectionProvider(args.serverId));
+    if (connection == null) return;
+
+    state = state.copyWith(
+      clearPendingPermission: true,
+      processingLabel: '正在确认权限...',
+    );
+
+    try {
+      await connection.apiClient.respondToPermission(
+        args.sessionId,
+        permissionId,
+        allow,
+        permanent: permanent,
+      );
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+    }
+  }
+
+  Future<void> abort() async {
+    final connection = ref.read(activeConnectionProvider(args.serverId));
+    if (connection == null) return;
+    try {
+      await connection.apiClient.abort(args.sessionId);
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+    }
+  }
+
+  Future<void> revert() async {
+    final connection = ref.read(activeConnectionProvider(args.serverId));
+    if (connection == null) return;
+    state = state.copyWith(isLoading: true);
+    try {
+      await connection.apiClient.revert(args.sessionId);
+      await refreshMessages(stopStreaming: true);
+    } catch (error) {
+      state = state.copyWith(error: error.toString(), isLoading: false);
+    }
+  }
+
   void _handleEvent(OpencodeEvent event) {
     if (!_matchesSession(event)) return;
     _resetStreamEndTimer();
@@ -307,6 +360,7 @@ class ChatController extends StateNotifier<ChatState> {
         state = state.copyWith(
           isStreaming: true,
           processingLabel: '等待权限确认...',
+          pendingPermission: event,
         );
         return;
 

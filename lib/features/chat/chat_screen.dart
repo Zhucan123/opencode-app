@@ -1,8 +1,10 @@
 import 'package:code_app/features/chat/chat_provider.dart';
 import 'package:code_app/features/chat/widgets/chat_input_bar.dart';
 import 'package:code_app/features/chat/widgets/message_bubble.dart';
+import 'package:code_app/features/chat/widgets/permission_sheet.dart';
 import 'package:code_app/features/sessions/session_provider.dart';
 import 'package:code_app/shared/theme.dart';
+import 'package:code_app/core/api/models/event.dart';
 import 'package:code_app/core/api/models/message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -58,11 +60,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final showTailBubble = pendingText.isNotEmpty || showThinkingBubble;
     final isBusy = state.isSending || state.isStreaming;
 
-    ref.listen<ChatState>(chatProvider(args), (_, next) {
+    ref.listen<ChatState>(chatProvider(args), (prev, next) {
       if (next.error != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(next.error!)),
         );
+      }
+      if (prev?.pendingPermission == null && next.pendingPermission != null && mounted) {
+        _showPermissionSheet(next.pendingPermission!);
       }
       if (mounted) {
         _scrollToBottom();
@@ -70,7 +75,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          if (state.messages.isNotEmpty && !isBusy)
+            IconButton(
+              icon: const Icon(Icons.undo_rounded),
+              tooltip: 'Undo last message',
+              onPressed: () => ref.read(chatProvider(args).notifier).revert(),
+            ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -113,6 +128,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             selectedModel: state.selectedModel,
             onModelSelected: (model) => ref.read(chatProvider(args).notifier).setModel(model),
             onSend: (text) => ref.read(chatProvider(args).notifier).sendMessage(text),
+            onAbort: () => ref.read(chatProvider(args).notifier).abort(),
           ),
         ],
       ),
@@ -142,6 +158,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         curve: Curves.easeOut,
       );
     });
+  }
+
+  void _showPermissionSheet(OpencodeEvent event) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: PermissionSheet(
+            event: event,
+            onDecision: (allow, permanent) {
+              Navigator.of(context).pop();
+              ref.read(chatProvider(args).notifier).respondToPermission(
+                    allow,
+                    permanent: permanent,
+                  );
+            },
+          ),
+        );
+      },
+    );
   }
 }
 
