@@ -355,13 +355,15 @@ class ChatController extends StateNotifier<ChatState> {
 
       case OpencodeEventType.messagePartUpdated:
         final part = event.part;
-        if (part == null || part.isSkippable || part.type != 'text') return;
+        if (part == null || part.isSkippable || (part.type != 'text' && part.type != 'reasoning')) return;
         // 跳过用户消息的 part，避免渲染到 assistant 流式气泡
         if (_userMessageIds.contains(part.messageId)) return;
         final text = part.text;
         if (text == null || text.isEmpty) return;
 
-        final updated = _updateStreamingPart(part.messageId, part.id, text);
+        // 如果是思考过程，可以在流式阶段简单加上前缀以便区分
+        final streamingText = part.type == 'reasoning' ? '💡 $text' : text;
+        final updated = _updateStreamingPart(part.messageId, part.id, streamingText);
         state = state.copyWith(
           streamingParts: updated,
           isStreaming: true,

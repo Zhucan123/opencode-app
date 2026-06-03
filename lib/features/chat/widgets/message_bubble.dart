@@ -92,6 +92,12 @@ class _AssistantMessageMarkdown extends StatelessWidget {
           part.type == MessagePartType.markdown) {
         textBuffer.writeln(part.text);
         textBuffer.writeln();
+      } else if (part.type == MessagePartType.reasoning) {
+        flushText();
+        children.add(Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: _ReasoningCard(text: part.text),
+        ));
       } else if (part.type == MessagePartType.code) {
         final lang = part.language ?? '';
         textBuffer.writeln('```$lang\n${part.text}\n```\n');
@@ -472,6 +478,62 @@ class _DiffPreviewCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReasoningCard extends StatelessWidget {
+  const _ReasoningCard({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    if (text.isEmpty) return const SizedBox.shrink();
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: false,
+          collapsedIconColor: AppColors.textMuted,
+          iconColor: AppColors.textMuted,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          minTileHeight: 40,
+          title: Row(
+            children: [
+              const Icon(Icons.psychology_outlined, size: 16, color: AppColors.textMuted),
+              const SizedBox(width: 8),
+              Text(
+                '深度思考',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: SelectableText(
+                text,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textMuted.withOpacity(0.8),
+                  height: 1.5,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

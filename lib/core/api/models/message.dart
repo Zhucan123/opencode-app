@@ -25,6 +25,7 @@ enum MessagePartType {
   toolResult,
   stepStart,
   stepFinish,
+  reasoning,
   unknown;
 
   static MessagePartType fromJson(Object? value) {
@@ -37,6 +38,7 @@ enum MessagePartType {
       'tool_result' || 'toolResult' => MessagePartType.toolResult,
       'step-start' => MessagePartType.stepStart,
       'step-finish' => MessagePartType.stepFinish,
+      'reasoning' || 'thought' => MessagePartType.reasoning,
       _ => MessagePartType.unknown,
     };
   }
