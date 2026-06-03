@@ -307,7 +307,7 @@ class ChatController extends StateNotifier<ChatState> {
 
     switch (event.type) {
       case OpencodeEventType.sessionUpdated:
-        // 如果后端传来了会话状态，且为 ready / error，则代表流式彻底结束
+        // 兼容旧版，如果传来了会话状态，且为 ready / error，则代表流式彻底结束
         final sessionState = event.session?.state?.toLowerCase();
         if (sessionState == 'ready' || sessionState == 'error' || sessionState == 'stopped') {
           _refreshTimer?.cancel();
@@ -316,6 +316,21 @@ class ChatController extends StateNotifier<ChatState> {
           return;
         }
         // 否则继续认为是 streaming 状态
+        state = state.copyWith(
+          isStreaming: true,
+          processingLabel: state.processingLabel ?? 'OpenCode 正在思考...',
+          clearError: true,
+        );
+        return;
+
+      case OpencodeEventType.sessionStatus:
+        final statusType = event.sessionStatusType?.toLowerCase();
+        if (statusType == 'idle') {
+          _refreshTimer?.cancel();
+          _streamStopTimer?.cancel();
+          refreshMessages(stopStreaming: true);
+          return;
+        }
         state = state.copyWith(
           isStreaming: true,
           processingLabel: state.processingLabel ?? 'OpenCode 正在思考...',

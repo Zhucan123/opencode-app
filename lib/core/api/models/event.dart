@@ -12,11 +12,13 @@ enum OpencodeEventType {
   toolCalled,
   permissionAsked,
   sessionError,
+  sessionStatus,
   unknown;
 
   static OpencodeEventType fromName(String name) {
     return switch (name) {
       'session.updated' => OpencodeEventType.sessionUpdated,
+      'session.status' => OpencodeEventType.sessionStatus,
       'message.updated' => OpencodeEventType.messageUpdated,
       'message.part.updated' => OpencodeEventType.messagePartUpdated,
       'message.part.delta' => OpencodeEventType.messagePartDelta,
@@ -47,6 +49,7 @@ class OpencodeEvent {
     this.title,
     this.command,
     this.error,
+    this.sessionStatusType,
   });
 
   final OpencodeEventType type;
@@ -65,6 +68,7 @@ class OpencodeEvent {
   final String? title;
   final String? command;
   final String? error;
+  final String? sessionStatusType;
 
   factory OpencodeEvent.fromSse({required String eventName, required String data}) {
     Map<String, dynamic> outer;
@@ -120,6 +124,11 @@ class OpencodeEvent {
         ? properties['partID']?.toString()
         : null;
 
+    String? sessionStatusType;
+    if (rawType == 'session.status' && properties['status'] is Map) {
+      sessionStatusType = properties['status']['type']?.toString();
+    }
+
     return OpencodeEvent(
       type: OpencodeEventType.fromName(rawType),
       rawType: rawType,
@@ -143,6 +152,7 @@ class OpencodeEvent {
       title: properties['title']?.toString() ?? inner['title']?.toString(),
       command: properties['command']?.toString() ?? inner['command']?.toString(),
       error: properties['error']?.toString() ?? inner['error']?.toString(),
+      sessionStatusType: sessionStatusType,
     );
   }
 }
