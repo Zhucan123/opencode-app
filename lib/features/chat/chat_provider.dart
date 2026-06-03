@@ -33,6 +33,7 @@ class ChatState {
     this.isLoading = false,
     this.isSending = false,
     this.isStreaming = false,
+    this.processingLabel,
     this.error,
   });
 
@@ -45,6 +46,7 @@ class ChatState {
   final bool isLoading;
   final bool isSending;
   final bool isStreaming;
+  final String? processingLabel;
   final String? error;
 
   /// 获取某条消息的流式累积文本
@@ -69,6 +71,8 @@ class ChatState {
     bool? isLoading,
     bool? isSending,
     bool? isStreaming,
+    String? processingLabel,
+    bool clearProcessingLabel = false,
     String? error,
     bool clearError = false,
   }) {
@@ -79,11 +83,14 @@ class ChatState {
       selectedMode: clearSelectedMode ? null : (selectedMode ?? this.selectedMode),
       availableModels: availableModels ?? this.availableModels,
       selectedModel: clearSelectedModel ? null : (selectedModel ?? this.selectedModel),
-      isLoading: isLoading ?? this.isLoading,
-      isSending: isSending ?? this.isSending,
-      isStreaming: isStreaming ?? this.isStreaming,
-      error: clearError ? null : (error ?? this.error),
-    );
+        isLoading: isLoading ?? this.isLoading,
+        isSending: isSending ?? this.isSending,
+        isStreaming: isStreaming ?? this.isStreaming,
+        processingLabel: clearProcessingLabel
+            ? null
+            : (processingLabel ?? this.processingLabel),
+        error: clearError ? null : (error ?? this.error),
+      );
   }
 }
 
@@ -157,6 +164,7 @@ class ChatController extends StateNotifier<ChatState> {
         streamingParts: stopStreaming ? const {} : state.streamingParts,
         isLoading: false,
         isStreaming: stopStreaming ? false : state.isStreaming,
+        clearProcessingLabel: stopStreaming,
       );
       if (stopStreaming) _userMessageIds.clear();
     } catch (error) {
@@ -186,6 +194,7 @@ class ChatController extends StateNotifier<ChatState> {
     state = state.copyWith(
       messages: [...state.messages, optimistic],
       isSending: true,
+      processingLabel: 'OpenCode 正在思考...',
       clearError: true,
     );
 
@@ -197,9 +206,18 @@ class ChatController extends StateNotifier<ChatState> {
         modelId: state.selectedModel?.id,
         providerId: state.selectedModel?.providerId,
       );
-      state = state.copyWith(isSending: false, isStreaming: true);
+      state = state.copyWith(
+        isSending: false,
+        isStreaming: true,
+        processingLabel: 'OpenCode 正在思考...',
+      );
     } catch (error) {
-      state = state.copyWith(isSending: false, isStreaming: false, error: error.toString());
+      state = state.copyWith(
+        isSending: false,
+        isStreaming: false,
+        clearProcessingLabel: true,
+        error: error.toString(),
+      );
     }
   }
 
@@ -217,7 +235,11 @@ class ChatController extends StateNotifier<ChatState> {
         }
         // 只标记流式状态，不修改 messages 列表
         // messages 列表由 REST API 维护，SSE 只做流式内容展示
-        state = state.copyWith(isStreaming: true, clearError: true);
+        state = state.copyWith(
+          isStreaming: true,
+          processingLabel: 'OpenCode 正在思考...',
+          clearError: true,
+        );
         return;
 
       case OpencodeEventType.messagePartUpdated:
@@ -229,7 +251,11 @@ class ChatController extends StateNotifier<ChatState> {
         if (text == null || text.isEmpty) return;
 
         final updated = _updateStreamingPart(part.messageId, part.id, text);
-        state = state.copyWith(streamingParts: updated, isStreaming: true);
+        state = state.copyWith(
+          streamingParts: updated,
+          isStreaming: true,
+          processingLabel: 'OpenCode 正在回复...',
+        );
         return;
 
       case OpencodeEventType.messagePartDelta:
@@ -241,7 +267,11 @@ class ChatController extends StateNotifier<ChatState> {
         final currentText = state.streamingParts[delta.messageId]?[delta.partId] ?? '';
         final updated = _updateStreamingPart(
             delta.messageId, delta.partId, currentText + delta.delta);
-        state = state.copyWith(streamingParts: updated, isStreaming: true);
+        state = state.copyWith(
+          streamingParts: updated,
+          isStreaming: true,
+          processingLabel: 'OpenCode 正在回复...',
+        );
         return;
 
       case OpencodeEventType.messagePartRemoved:
@@ -261,12 +291,25 @@ class ChatController extends StateNotifier<ChatState> {
         state = state.copyWith(
           isStreaming: false,
           isSending: false,
+          clearProcessingLabel: true,
           error: event.error ?? 'OpenCode 返回错误事件。',
         );
         return;
 
       case OpencodeEventType.toolCalled:
+        state = state.copyWith(
+          isStreaming: true,
+          processingLabel: 'OpenCode 正在执行工具...',
+        );
+        return;
+
       case OpencodeEventType.permissionAsked:
+        state = state.copyWith(
+          isStreaming: true,
+          processingLabel: '等待权限确认...',
+        );
+        return;
+
       case OpencodeEventType.unknown:
         return;
     }

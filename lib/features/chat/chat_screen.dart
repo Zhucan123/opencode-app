@@ -3,6 +3,7 @@ import 'package:code_app/features/chat/widgets/chat_input_bar.dart';
 import 'package:code_app/features/chat/widgets/message_bubble.dart';
 import 'package:code_app/features/sessions/session_provider.dart';
 import 'package:code_app/shared/theme.dart';
+import 'package:code_app/core/api/models/message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,6 +45,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
     final state = ref.watch(chatProvider(args));
     final title = _sessionTitle();
+    final existingIds = state.messages.map((m) => m.id).toSet();
+    final pendingText = state.streamingParts.entries
+        .where((e) => !existingIds.contains(e.key))
+        .map((e) => e.value.values.join(''))
+        .where((t) => t.isNotEmpty)
+        .join('\n\n');
+    final lastMessage = state.messages.isNotEmpty ? state.messages.last : null;
+    final showThinkingBubble = state.isStreaming &&
+        pendingText.isEmpty &&
+        (lastMessage == null || lastMessage.role == MessageRole.user);
+    final showTailBubble = pendingText.isNotEmpty || showThinkingBubble;
+    final isBusy = state.isSending || state.isStreaming;
 
     ref.listen<ChatState>(chatProvider(args), (_, next) {
       if (next.error != null && mounted) {
@@ -69,23 +82,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-                      itemCount: state.messages.length + (state.isStreaming ? 1 : 0),
+                      itemCount: state.messages.length + (showTailBubble ? 1 : 0),
                       separatorBuilder: (_, __) => const SizedBox(height: 16),
                       itemBuilder: (context, index) {
-                        if (state.isStreaming && index == state.messages.length) {
-                          // 收集所有正在流式输出的文本（不在消息列表里的 messageId）
-                          final existingIds = state.messages.map((m) => m.id).toSet();
-                          final pendingText = state.streamingParts.entries
-                              .where((e) => !existingIds.contains(e.key))
-                              .map((e) => e.value.values.join(''))
-                              .where((t) => t.isNotEmpty)
-                              .join('\n\n');
-
+                        if (showTailBubble && index == state.messages.length) {
                           if (pendingText.isNotEmpty) {
                             // 有流式内容但还没进 REST 列表，显示为临时气泡
                             return _StreamingBubble(text: pendingText);
                           }
-                          return const _ThinkingBubble();
+                          return _ThinkingBubble(
+                            text: state.processingLabel ?? 'OpenCode 正在思考...',
+                          );
                         }
                         final msg = state.messages[index];
                         final streamingText = state.streamingTextFor(msg.id);
@@ -98,7 +105,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
           ChatInputBar(
-            isBusy: state.isSending,
+            isBusy: isBusy,
             availableModes: state.availableModes,
             selectedMode: state.selectedMode,
             onModeSelected: (mode) => ref.read(chatProvider(args).notifier).setMode(mode),
@@ -164,7 +171,9 @@ class _StreamingBubble extends StatelessWidget {
 }
 
 class _ThinkingBubble extends StatelessWidget {
-  const _ThinkingBubble();
+  const _ThinkingBubble({required this.text});
+
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -187,7 +196,7 @@ class _ThinkingBubble extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              'OpenCode 正在思考...',
+              text,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textMuted,
                   ),
@@ -198,4 +207,3 @@ class _ThinkingBubble extends StatelessWidget {
     );
   }
 }
-

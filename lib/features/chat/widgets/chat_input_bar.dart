@@ -63,6 +63,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 children: [
                   if (widget.availableModes.isNotEmpty)
                     _ModeButton(
+                      enabled: !widget.isBusy,
                       selected: widget.selectedMode,
                       modes: widget.availableModes,
                       onModeSelected: widget.onModeSelected,
@@ -71,6 +72,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     const SizedBox(width: 8),
                   if (widget.availableModels.isNotEmpty)
                     _ModelButton(
+                      enabled: !widget.isBusy,
                       selected: widget.selectedModel,
                       models: widget.availableModels,
                       onModelSelected: widget.onModelSelected,
@@ -136,11 +138,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
 class _ModeButton extends StatelessWidget {
   const _ModeButton({
+    required this.enabled,
     required this.selected,
     required this.modes,
     this.onModeSelected,
   });
 
+  final bool enabled;
   final String? selected;
   final List<String> modes;
   final ValueChanged<String>? onModeSelected;
@@ -148,12 +152,12 @@ class _ModeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _showModeSheet(context),
+      onTap: enabled ? () => _showModeSheet(context) : null,
       child: Container(
         height: 28,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: enabled ? AppColors.surface : AppColors.card,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.border),
         ),
@@ -163,14 +167,15 @@ class _ModeButton extends StatelessWidget {
             Text(
               selected ?? 'build',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppColors.accent,
+                    color: enabled ? AppColors.accent : AppColors.textMuted,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
             ),
             const SizedBox(width: 3),
-            const Icon(Icons.expand_more_rounded,
-                size: 13, color: AppColors.textMuted),
+            Icon(Icons.expand_more_rounded,
+                size: 13,
+                color: enabled ? AppColors.textMuted : AppColors.border),
           ],
         ),
       ),
@@ -273,11 +278,13 @@ class _ModeButton extends StatelessWidget {
 
 class _ModelButton extends StatelessWidget {
   const _ModelButton({
+    required this.enabled,
     required this.selected,
     required this.models,
     this.onModelSelected,
   });
 
+  final bool enabled;
   final OpencodeModel? selected;
   final List<OpencodeModel> models;
   final ValueChanged<OpencodeModel>? onModelSelected;
@@ -288,31 +295,33 @@ class _ModelButton extends StatelessWidget {
     // 截断太长的模型名
     final short = label.length > 20 ? '${label.substring(0, 18)}…' : label;
     return GestureDetector(
-      onTap: () => _showModelSheet(context),
+      onTap: enabled ? () => _showModelSheet(context) : null,
       child: Container(
         height: 28,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: enabled ? AppColors.surface : AppColors.card,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.auto_awesome_outlined,
-                size: 12, color: AppColors.textMuted),
+            Icon(Icons.auto_awesome_outlined,
+                size: 12,
+                color: enabled ? AppColors.textMuted : AppColors.border),
             const SizedBox(width: 4),
             Text(
               short,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppColors.textMuted,
+                    color: enabled ? AppColors.textMuted : AppColors.border,
                     fontSize: 12,
                   ),
             ),
             const SizedBox(width: 3),
-            const Icon(Icons.expand_more_rounded,
-                size: 13, color: AppColors.textMuted),
+            Icon(Icons.expand_more_rounded,
+                size: 13,
+                color: enabled ? AppColors.textMuted : AppColors.border),
           ],
         ),
       ),
