@@ -30,6 +30,7 @@ class ChatState {
   const ChatState({
     this.messages = const <OpencodeMessage>[],
     this.streamingParts = const <String, Map<String, String>>{},
+    this.streamingReasoningText = '',
     this.availableModes = const <String>[],
     this.selectedMode,
     this.availableModels = const <OpencodeModel>[],
@@ -44,6 +45,7 @@ class ChatState {
 
   final List<OpencodeMessage> messages;
   final Map<String, Map<String, String>> streamingParts;
+  final String streamingReasoningText;
   final List<String> availableModes;
   final String? selectedMode;
   final List<OpencodeModel> availableModels;
@@ -68,6 +70,8 @@ class ChatState {
   ChatState copyWith({
     List<OpencodeMessage>? messages,
     Map<String, Map<String, String>>? streamingParts,
+    String? streamingReasoningText,
+    bool clearStreamingReasoning = false,
     List<String>? availableModes,
     String? selectedMode,
     bool clearSelectedMode = false,
@@ -87,6 +91,7 @@ class ChatState {
     return ChatState(
       messages: messages ?? this.messages,
       streamingParts: streamingParts ?? this.streamingParts,
+      streamingReasoningText: clearStreamingReasoning ? '' : (streamingReasoningText ?? this.streamingReasoningText),
       availableModes: availableModes ?? this.availableModes,
       selectedMode: clearSelectedMode ? null : (selectedMode ?? this.selectedMode),
       availableModels: availableModels ?? this.availableModels,
@@ -225,6 +230,7 @@ class ChatController extends StateNotifier<ChatState> {
       state = state.copyWith(
         messages: messages,
         streamingParts: stopStreaming ? const {} : state.streamingParts,
+        clearStreamingReasoning: stopStreaming,
         isLoading: false,
         isStreaming: stopStreaming ? false : state.isStreaming,
         clearProcessingLabel: stopStreaming,
@@ -410,14 +416,20 @@ class ChatController extends StateNotifier<ChatState> {
         final text = part.text;
         if (text == null || text.isEmpty) return;
 
-        // 如果是思考过程，可以在流式阶段简单加上前缀以便区分
-        final streamingText = part.type == 'reasoning' ? '💡 $text' : text;
-        final updated = _updateStreamingPart(part.messageId, part.id, streamingText);
-        state = state.copyWith(
-          streamingParts: updated,
-          isStreaming: true,
-          processingLabel: 'OpenCode 正在回复...',
-        );
+        if (part.type == 'reasoning') {
+          state = state.copyWith(
+            streamingReasoningText: text,
+            isStreaming: true,
+            processingLabel: 'OpenCode 正在回复...',
+          );
+        } else {
+          final updated = _updateStreamingPart(part.messageId, part.id, text);
+          state = state.copyWith(
+            streamingParts: updated,
+            isStreaming: true,
+            processingLabel: 'OpenCode 正在回复...',
+          );
+        }
         return;
 
       case OpencodeEventType.messagePartDelta:

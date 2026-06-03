@@ -60,9 +60,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         .map((e) => e.value.values.join(''))
         .where((t) => t.isNotEmpty)
         .join('\n\n');
+    final pendingReasoning = state.streamingReasoningText;
     final lastMessage = state.messages.isNotEmpty ? state.messages.last : null;
-    final showThinkingBubble = state.isStreaming && pendingText.isEmpty;
-    final showTailBubble = pendingText.isNotEmpty || showThinkingBubble;
+    final showThinkingBubble = state.isStreaming && pendingText.isEmpty && pendingReasoning.isEmpty;
+    final showTailBubble = pendingText.isNotEmpty || pendingReasoning.isNotEmpty || showThinkingBubble;
     final isBusy = state.isSending || state.isStreaming || isReconnecting || isConnError;
 
     ref.listen<ConnectionViewState>(connectionProvider(widget.serverId), (prev, next) {
@@ -137,8 +138,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 16),
                       itemBuilder: (context, index) {
                         if (showTailBubble && index == state.messages.length) {
+                          if (pendingReasoning.isNotEmpty) {
+                            return _StreamingReasoningCard(text: pendingReasoning);
+                          }
                           if (pendingText.isNotEmpty) {
-                            // 有流式内容但还没进 REST 列表，显示为临时气泡
                             return _StreamingBubble(text: pendingText);
                           }
                           return _ThinkingBubble(
@@ -292,14 +295,75 @@ class _ThinkingBubble extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              text,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            text,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textMuted,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StreamingReasoningCard extends StatelessWidget {
+  const _StreamingReasoningCard({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            initiallyExpanded: false,
+            collapsedIconColor: AppColors.textMuted,
+            iconColor: AppColors.textMuted,
+            tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+            minTileHeight: 38,
+            title: Row(
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 1.5),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '深度思考中...',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textMuted,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+              ],
             ),
-          ],
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                child: Text(
+                  text,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textMuted,
+                    height: 1.5,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
 }
