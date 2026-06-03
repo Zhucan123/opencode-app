@@ -34,7 +34,7 @@ class _PermissionSheetState extends State<PermissionSheet> {
           children: [
             Row(
               children: [
-                const Icon(Icons.security, color: AppColors.primary, size: 28),
+                const Icon(Icons.security, color: AppColors.accent, size: 28),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -93,8 +93,8 @@ class _PermissionSheetState extends State<PermissionSheet> {
                     onPressed: () => widget.onDecision(false, _permanent),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: AppColors.error),
-                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.danger),
+                      foregroundColor: AppColors.danger,
                     ),
                     child: const Text('拒绝 (Deny)'),
                   ),
@@ -105,8 +105,8 @@ class _PermissionSheetState extends State<PermissionSheet> {
                     onPressed: () => widget.onDecision(true, _permanent),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.text,
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.textPrimary,
                     ),
                     child: const Text('允许 (Allow)'),
                   ),

@@ -67,7 +67,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         );
       }
       if (prev?.pendingPermission == null && next.pendingPermission != null && mounted) {
-        _showPermissionSheet(next.pendingPermission!);
+        _showPermissionSheet(next.pendingPermission!, args);
       }
       if (mounted) {
         _scrollToBottom();
@@ -160,7 +160,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
-  void _showPermissionSheet(OpencodeEvent event) {
+  void _showPermissionSheet(OpencodeEvent event, ChatProviderArgs args) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,

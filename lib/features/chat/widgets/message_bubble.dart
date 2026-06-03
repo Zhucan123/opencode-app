@@ -235,7 +235,7 @@ class _DiffPreviewCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                const Icon(Icons.difference_outlined, size: 18, color: AppColors.primary),
+                const Icon(Icons.difference_outlined, size: 18, color: AppColors.accent),
                 const SizedBox(width: 8),
                 Text(
                   '代码变更 (Diff)',
