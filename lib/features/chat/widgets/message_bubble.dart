@@ -117,9 +117,20 @@ class _AssistantMessageMarkdown extends StatelessWidget {
         textBuffer.writeln('```$lang\n${part.text}\n```\n');
       } else if (part.type == MessagePartType.toolCall) {
         flushText();
+        final raw = part.rawJson ?? {};
+        final toolName = raw['tool_name']?.toString() ??
+            raw['toolName']?.toString() ??
+            raw['tool']?.toString() ??
+            raw['name']?.toString() ??
+            '';
+        final stateObj = raw['state'] is Map ? raw['state'] as Map : null;
+        final inputObj = stateObj != null ? stateObj['input'] : raw['input'] ?? raw['args'];
+        final isTodo = toolName.toLowerCase() == 'todowrite';
         children.add(Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: _ToolExecutionCard(part: part),
+          child: isTodo
+              ? _TodoCard(input: inputObj)
+              : _ToolExecutionCard(part: part),
         ));
       } else if (part.type == MessagePartType.stepStart || part.type == MessagePartType.stepFinish) {
         // 忽略底层的 step 事件，避免界面杂乱
@@ -633,6 +644,186 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
       padding: const EdgeInsets.all(12),
       color: const Color(0xFF1E1E1E),
       child: SelectableText.rich(TextSpan(children: spans)),
+    );
+  }
+}
+
+class _TodoCard extends StatefulWidget {
+  const _TodoCard({required this.input});
+
+  final dynamic input;
+
+  @override
+  State<_TodoCard> createState() => _TodoCardState();
+}
+
+class _TodoCardState extends State<_TodoCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final todos = _parseTodos(widget.input);
+    final total = todos.length;
+    final completed = todos.where((t) => t['status'] == 'completed').length;
+    final inProgress = todos.where((t) => t['status'] == 'in_progress').length;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: todos.isNotEmpty ? () => setState(() => _expanded = !_expanded) : null,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.checklist_rtl_rounded, size: 18, color: AppColors.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '任务计划',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (total > 0) ...[
+                    if (inProgress > 0)
+                      Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$inProgress 进行中',
+                          style: TextStyle(fontSize: 11, color: AppColors.accent),
+                        ),
+                      ),
+                    Text(
+                      '$completed/$total',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (_expanded && todos.isNotEmpty) ...[
+            const Divider(height: 1, color: AppColors.border),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                children: todos.map((todo) => _TodoItem(todo: todo)).toList(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _parseTodos(dynamic input) {
+    if (input is Map) {
+      final todosRaw = input['todos'];
+      if (todosRaw is List) {
+        return todosRaw.whereType<Map>().map((t) => Map<String, dynamic>.from(t)).toList();
+      }
+    }
+    return const [];
+  }
+}
+
+class _TodoItem extends StatelessWidget {
+  const _TodoItem({required this.todo});
+
+  final Map<String, dynamic> todo;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = todo['content']?.toString() ?? '';
+    final status = todo['status']?.toString() ?? 'pending';
+    final priority = todo['priority']?.toString() ?? 'medium';
+
+    final isCompleted = status == 'completed';
+    final isCancelled = status == 'cancelled';
+    final isInProgress = status == 'in_progress';
+    final isHighPriority = priority == 'high';
+
+    Widget statusIcon;
+    Color textColor;
+    if (isCompleted) {
+      statusIcon = const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF4CAF50));
+      textColor = AppColors.textMuted;
+    } else if (isCancelled) {
+      statusIcon = Icon(Icons.cancel_outlined, size: 16, color: AppColors.textMuted.withOpacity(0.5));
+      textColor = AppColors.textMuted.withOpacity(0.5);
+    } else if (isInProgress) {
+      statusIcon = SizedBox(
+        width: 14,
+        height: 14,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: AppColors.accent,
+        ),
+      );
+      textColor = AppColors.textPrimary;
+    } else {
+      statusIcon = Icon(Icons.radio_button_unchecked, size: 16, color: AppColors.textMuted);
+      textColor = AppColors.textPrimary;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isHighPriority && !isCompleted && !isCancelled)
+            Container(
+              width: 3,
+              height: 16,
+              margin: const EdgeInsets.only(right: 8, top: 1),
+              decoration: BoxDecoration(
+                color: AppColors.warning,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            )
+          else
+            const SizedBox(width: 11),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: statusIcon,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              content,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: textColor,
+                decoration: (isCompleted || isCancelled)
+                    ? TextDecoration.lineThrough
+                    : null,
+                decorationColor: textColor,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
