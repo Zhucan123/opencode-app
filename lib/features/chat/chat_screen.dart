@@ -71,7 +71,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final pendingReasoning = state.streamingReasoningText;
     final lastMessage = state.messages.isNotEmpty ? state.messages.last : null;
     final showThinkingBubble = state.isStreaming && pendingText.isEmpty && pendingReasoning.isEmpty;
-    final showTailBubble = pendingText.isNotEmpty || pendingReasoning.isNotEmpty || showThinkingBubble;
+    final showTailBubble = state.isStreaming && (pendingText.isNotEmpty || pendingReasoning.isNotEmpty || showThinkingBubble);
     final isBusy = state.isSending || state.isStreaming || isReconnecting || isConnError;
 
     ref.listen<ConnectionViewState>(connectionProvider(widget.serverId), (prev, next) {
