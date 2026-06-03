@@ -20,6 +20,11 @@ enum MessagePartType {
   text,
   markdown,
   code,
+  patch,
+  toolCall,
+  toolResult,
+  stepStart,
+  stepFinish,
   unknown;
 
   static MessagePartType fromJson(Object? value) {
@@ -27,6 +32,11 @@ enum MessagePartType {
       'text' => MessagePartType.text,
       'markdown' => MessagePartType.markdown,
       'code' => MessagePartType.code,
+      'patch' => MessagePartType.patch,
+      'tool_call' || 'toolCall' => MessagePartType.toolCall,
+      'tool_result' || 'toolResult' => MessagePartType.toolResult,
+      'step-start' => MessagePartType.stepStart,
+      'step-finish' => MessagePartType.stepFinish,
       _ => MessagePartType.unknown,
     };
   }
@@ -37,11 +47,13 @@ class MessagePart {
     required this.type,
     required this.text,
     this.language,
+    this.rawJson,
   });
 
   final MessagePartType type;
   final String text;
   final String? language;
+  final Map<String, dynamic>? rawJson;
 
   factory MessagePart.fromJson(Object? raw) {
     if (raw is String) {
@@ -53,6 +65,7 @@ class MessagePart {
       type: MessagePartType.fromJson(json['type']),
       text: json['text']?.toString() ?? json['content']?.toString() ?? '',
       language: json['language']?.toString(),
+      rawJson: json,
     );
   }
 
