@@ -4,6 +4,7 @@ import 'package:code_app/core/api/models/message.dart';
 import 'package:code_app/features/chat/markdown/code_element_builder.dart';
 import 'package:code_app/features/connection/connection_provider.dart';
 import 'package:code_app/shared/theme.dart';
+import 'package:diff_match_patch/diff_match_patch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -586,70 +587,203 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
   }
 
   Widget _buildDiffContent(BuildContext context, List<FileDiff> diffs) {
-    final spans = <TextSpan>[];
+    const contextLines = 3;
+    const maxLinesPerFile = 120;
+    const bgColor = Color(0xFF1E1E1E);
+
+    final fileWidgets = <Widget>[];
+
     for (final diff in diffs) {
-      // 文件名行
-      spans.add(TextSpan(
-        text: '─── ${diff.file} ───\n',
-        style: TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 12,
-          color: AppColors.textMuted,
-          fontWeight: FontWeight.bold,
-        ),
-      ));
-      // 行级 diff：对比 before/after
       final beforeLines = diff.before.split('\n');
       final afterLines = diff.after.split('\n');
-      final maxLen = beforeLines.length > afterLines.length
-          ? beforeLines.length
-          : afterLines.length;
-      for (var i = 0; i < maxLen; i++) {
-        final b = i < beforeLines.length ? beforeLines[i] : null;
-        final a = i < afterLines.length ? afterLines[i] : null;
-        if (b == a) {
-          spans.add(TextSpan(
-            text: ' $b\n',
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-              color: Colors.white70,
-            ),
-          ));
-        } else {
-          if (b != null) {
-            spans.add(TextSpan(
-              text: '-$b\n',
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                color: Color(0xFFEF9A9A),
-                backgroundColor: Color(0x33F44336),
-              ),
-            ));
-          }
-          if (a != null) {
-            spans.add(TextSpan(
-              text: '+$a\n',
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                color: Color(0xFFA5D6A7),
-                backgroundColor: Color(0x334CAF50),
-              ),
-            ));
+
+      // 用 diff_match_patch 做行级 diff
+      final dmp = DiffMatchPatch();
+      final lineResult = dmp.diff_linesToChars(diff.before, diff.after);
+      final diffs2 = dmp.diff_main(
+        lineResult.chars1 as String,
+        lineResult.chars2 as String,
+        false,
+      );
+      dmp.diff_charsToLines(diffs2, lineResult.lineArray as List);
+      dmp.diff_cleanupSemantic(diffs2);
+
+      // 转换为行操作列表
+      final ops = <_DiffLine>[];
+      for (final d in diffs2) {
+        final lines = d.text.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          final line = lines[i];
+          if (i == lines.length - 1 && line.isEmpty) continue;
+          ops.add(_DiffLine(op: d.operation, text: line));
+        }
+      }
+
+      // 计算哪些行需要显示（变更行 + 前后 contextLines 行）
+      final changed = <int>{};
+      for (var i = 0; i < ops.length; i++) {
+        if (ops[i].op != 0) {
+          for (var j = (i - contextLines).clamp(0, ops.length - 1);
+              j <= (i + contextLines).clamp(0, ops.length - 1);
+              j++) {
+            changed.add(j);
           }
         }
       }
-      spans.add(const TextSpan(text: '\n'));
+
+      if (changed.isEmpty) continue; // 文件无变化跳过
+
+      final spans = <TextSpan>[];
+      var shownLines = 0;
+      var lastShown = -2;
+
+      for (var i = 0; i < ops.length && shownLines < maxLinesPerFile; i++) {
+        if (!changed.contains(i)) continue;
+
+        if (i > lastShown + 1) {
+          // 折叠间隔
+          spans.add(TextSpan(
+            text: '@@ ... @@\n',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 11,
+              color: AppColors.textMuted.withOpacity(0.6),
+            ),
+          ));
+        }
+        lastShown = i;
+
+        final op = ops[i];
+        if (op.op == -1) {
+          spans.add(TextSpan(
+            text: '-${op.text}\n',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12,
+              color: Color(0xFFEF9A9A),
+              backgroundColor: Color(0x22F44336),
+            ),
+          ));
+        } else if (op.op == 1) {
+          spans.add(TextSpan(
+            text: '+${op.text}\n',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12,
+              color: Color(0xFFA5D6A7),
+              backgroundColor: Color(0x224CAF50),
+            ),
+          ));
+        } else {
+          spans.add(TextSpan(
+            text: ' ${op.text}\n',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12,
+              color: Colors.white54,
+            ),
+          ));
+        }
+        shownLines++;
+      }
+
+      if (shownLines >= maxLinesPerFile) {
+        spans.add(TextSpan(
+          text: '... (内容过长，已截断)\n',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            color: AppColors.textMuted.withOpacity(0.6),
+          ),
+        ));
+      }
+
+      // 文件头
+      final shortName = diff.file.contains('/')
+          ? diff.file.split('/').last
+          : diff.file;
+
+      fileWidgets.add(Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            color: const Color(0xFF2A2A2A),
+            child: Row(
+              children: [
+                const Icon(Icons.insert_drive_file_outlined,
+                    size: 13, color: Color(0xFF888888)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    diff.file,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: Color(0xFFCCCCCC),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '+${diff.additions}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF4CAF50),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '-${diff.deletions}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFF44336),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            color: bgColor,
+            child: SelectableText.rich(TextSpan(children: spans)),
+          ),
+        ],
+      ));
     }
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      color: const Color(0xFF1E1E1E),
-      child: SelectableText.rich(TextSpan(children: spans)),
+    if (fileWidgets.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        color: bgColor,
+        child: const Text(
+          '(无变更内容)',
+          style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.white54),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+      child: Column(
+        children: fileWidgets
+            .expand((w) => [w, const Divider(height: 1, color: Color(0xFF333333))])
+            .toList()
+          ..removeLast(),
+      ),
     );
   }
+}
+
+class _DiffLine {
+  const _DiffLine({required this.op, required this.text});
+  final int op; // -1 delete, 0 equal, 1 insert
+  final String text;
 }
 
 class _TodoCard extends StatefulWidget {
