@@ -142,10 +142,6 @@ class ChatController extends StateNotifier<ChatState> {
   bool _isLoadingMore = false;
   final Map<String, String> _partTypes = {};
 
-  ChatController(this.args) : super(const ChatState()) {
-    _init();
-  }
-
   void _swapConnection(ActiveConnection newConnection) {
     _subscription?.cancel();
     _subscription = newConnection.events.listen(
@@ -159,6 +155,7 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   Future<void> _initialize() async {
+    try {
       final connection = ref.read(activeConnectionProvider(args.serverId));
       if (connection == null) {
         state = state.copyWith(isLoading: false, error: '未连接到服务器');
