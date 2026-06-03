@@ -11,9 +11,9 @@ class OpencodeClient {
             Dio(
               BaseOptions(
                 baseUrl: 'http://$host:$port',
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 120),
-                sendTimeout: const Duration(seconds: 10),
+                connectTimeout: const Duration(seconds: 15),
+                receiveTimeout: const Duration(minutes: 10), // AI 任务可能会阻塞很长时间
+                sendTimeout: const Duration(minutes: 5), // 防止大文件附件上传超时
                 responseType: ResponseType.json,
                 // SSH 隧道每次 forwardLocal 是独立 channel，不支持 keep-alive 复用
                 // 强制 Connection: close 确保每次请求用新 TCP 连接
