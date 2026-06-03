@@ -170,9 +170,17 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       final sessionModelId = currentSession?.modelId ?? lastModelId;
+      final sessionProviderId = currentSession?.providerId;
       OpencodeModel? initialModel;
       if (sessionModelId != null) {
-        initialModel = models.where((m) => m.id == sessionModelId).firstOrNull;
+        // 优先用 modelId + providerId 双字段精确匹配
+        if (sessionProviderId != null) {
+          initialModel = models
+              .where((m) => m.id == sessionModelId && m.providerId == sessionProviderId)
+              .firstOrNull;
+        }
+        // 降级：只用 modelId 匹配
+        initialModel ??= models.where((m) => m.id == sessionModelId).firstOrNull;
       }
       initialModel ??= models.isNotEmpty ? models.first : null;
 

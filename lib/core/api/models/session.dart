@@ -9,19 +9,21 @@ class OpencodeSession {
     this.state,
     this.agent,
     this.modelId,
+    this.providerId,
     this.cost,
     this.totalTokens,
   });
 
   final String id;
   final String title;
-  final String? parentId; // 子 agent 会话有此字段，主会话为 null
+  final String? parentId;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? preview;
   final String? state;
   final String? agent;
   final String? modelId;
+  final String? providerId;
   final double? cost;
   final int? totalTokens;
 
@@ -29,8 +31,11 @@ class OpencodeSession {
 
   factory OpencodeSession.fromJson(Map<String, dynamic> json) {
     String? modelId;
+    String? providerId;
     if (json['model'] is Map) {
-      modelId = json['model']['id']?.toString();
+      modelId = json['model']['modelID']?.toString() ??
+          json['model']['id']?.toString();
+      providerId = json['model']['providerID']?.toString();
     } else if (json['model'] is String) {
       modelId = json['model'].toString();
     }
@@ -62,6 +67,7 @@ class OpencodeSession {
       state: json['state']?.toString(),
       agent: json['agent']?.toString(),
       modelId: modelId,
+      providerId: providerId,
       cost: (json['cost'] as num?)?.toDouble(),
       totalTokens: totalTokens,
     );
