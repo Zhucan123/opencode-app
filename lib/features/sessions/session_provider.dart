@@ -13,17 +13,13 @@ class SessionListController
   Future<List<OpencodeSession>> build(String arg) async {
     _serverId = arg;
     final connection = ref.watch(activeConnectionProvider(_serverId));
-    if (connection == null) {
-      throw StateError('当前服务器尚未建立连接。');
-    }
+    if (connection == null) return const [];
     return connection.apiClient.getSessions();
   }
 
   Future<OpencodeSession> createSession({String? title}) async {
     final connection = ref.read(activeConnectionProvider(_serverId));
-    if (connection == null) {
-      throw StateError('当前服务器尚未建立连接。');
-    }
+    if (connection == null) return Future.error('连接已断开');
     final session = await connection.apiClient.createSession(title: title);
     state = AsyncData(await connection.apiClient.getSessions());
     return session;
@@ -31,27 +27,21 @@ class SessionListController
 
   Future<void> deleteSession(String sessionId) async {
     final connection = ref.read(activeConnectionProvider(_serverId));
-    if (connection == null) {
-      throw StateError('当前服务器尚未建立连接。');
-    }
+    if (connection == null) return;
     await connection.apiClient.deleteSession(sessionId);
     state = AsyncData(await connection.apiClient.getSessions());
   }
 
   Future<void> renameSession(String sessionId, String title) async {
     final connection = ref.read(activeConnectionProvider(_serverId));
-    if (connection == null) {
-      throw StateError('当前服务器尚未建立连接。');
-    }
+    if (connection == null) return;
     await connection.apiClient.renameSession(sessionId, title);
     state = AsyncData(await connection.apiClient.getSessions());
   }
 
   Future<void> refreshSessions() async {
     final connection = ref.read(activeConnectionProvider(_serverId));
-    if (connection == null) {
-      throw StateError('当前服务器尚未建立连接。');
-    }
+    if (connection == null) return;
     state = const AsyncLoading();
     state = AsyncData(await connection.apiClient.getSessions());
   }
