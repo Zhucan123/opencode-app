@@ -243,7 +243,7 @@ class ChatController extends StateNotifier<ChatState> {
     }
     if (extraParts != null) {
       for (final part in extraParts) {
-        if (part['type'] == 'image') {
+        if (part['type'] == 'file' && part['mime']?.toString().startsWith('image/') == true) {
           userParts.add(MessagePart(
             type: MessagePartType.image,
             text: '[图片]',

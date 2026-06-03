@@ -62,6 +62,11 @@ class MessagePart {
   String? get imageUrl {
     if (type != MessagePartType.image || rawJson == null) return null;
     
+    // {"type": "file", "url": "data:image/jpeg;base64,..."}
+    if (rawJson!['type'] == 'file' && rawJson!['url'] != null) {
+      return rawJson!['url'].toString();
+    }
+    
     // {"type": "image_url", "image_url": {"url": "..."}}
     if (rawJson!['image_url'] is Map && rawJson!['image_url']['url'] != null) {
       return rawJson!['image_url']['url'].toString();
@@ -83,8 +88,13 @@ class MessagePart {
     }
 
     final json = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+    var parsedType = MessagePartType.fromJson(json['type']);
+    if (json['type'] == 'file' && json['mime']?.toString().startsWith('image/') == true) {
+      parsedType = MessagePartType.image;
+    }
+
     return MessagePart(
-      type: MessagePartType.fromJson(json['type']),
+      type: parsedType,
       text: json['text']?.toString() ?? json['content']?.toString() ?? '',
       language: json['language']?.toString(),
       rawJson: json,

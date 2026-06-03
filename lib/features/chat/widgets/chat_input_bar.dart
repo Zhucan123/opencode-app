@@ -64,12 +64,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
           final ext = file.extension?.toLowerCase();
           final mediaType = ext == 'png' ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
           _extraParts.add({
-            'type': 'image',
-            'source': {
-              'type': 'base64',
-              'media_type': mediaType,
-              'data': base64String,
-            }
+            'type': 'file',
+            'mime': mediaType,
+            'url': 'data:$mediaType;base64,$base64String',
           });
         }
       });
@@ -131,7 +128,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   runSpacing: 8,
                   children: List.generate(_extraParts.length, (index) {
                     final part = _extraParts[index];
-                    final b64 = part['source']['data'] as String;
+                    final url = part['url'] as String;
+                    final b64 = url.split(',').last;
                     return Stack(
                       clipBehavior: Clip.none,
                       children: [

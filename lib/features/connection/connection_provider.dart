@@ -139,20 +139,20 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
     
     // 被动监听底层连接断开
     sshConnection.client.done.then((_) {
-      if (mounted && state.isConnected) {
+      if (mounted && state.status != ConnectionStatus.disconnected) {
         healthCheckAndReconnect();
       }
     }).catchError((_) {});
 
     sshConnection.opencodeSession.done.then((_) {
-      if (mounted && state.isConnected) {
+      if (mounted && state.status != ConnectionStatus.disconnected) {
         healthCheckAndReconnect();
       }
     }).catchError((_) {});
 
     // 主动应用层心跳（每 15 秒）
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (mounted && state.isConnected) {
+      if (mounted && state.status != ConnectionStatus.disconnected) {
         healthCheckAndReconnect();
       }
     });
