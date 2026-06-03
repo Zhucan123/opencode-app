@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      HAS_RELEASE_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' && secrets.RELEASE_STORE_PASSWORD != '' }}
+      HAS_RELEASE_SIGNING: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' && secrets.RELEASE_STORE_PASSWORD != '' && secrets.RELEASE_KEY_ALIAS != '' && secrets.RELEASE_KEY_PASSWORD != '' }}
 
     steps:
       - name: Checkout code
@@ -48,6 +48,25 @@ jobs:
             echo "NEED_UPLOAD=true" >> $GITHUB_ENV
           fi
 
+      - name: Validate release signing config
+        if: env.HAS_RELEASE_SIGNING == 'true'
+        env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          KEYSTORE_PATH="${{ github.workspace }}/android/app/release.keystore"
+          if keytool -list -v \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$RELEASE_STORE_PASSWORD" \
+            -alias "$RELEASE_KEY_ALIAS" >/dev/null 2>&1; then
+            echo "RELEASE_SIGNING_VALID=true" >> $GITHUB_ENV
+            echo "Release signing config is valid"
+          else
+            echo "RELEASE_SIGNING_VALID=false" >> $GITHUB_ENV
+            echo "::warning::Release keystore and secrets do not match. Release APK build will be skipped."
+          fi
+
       - name: Upload release keystore (first time setup)
         if: env.NEED_UPLOAD == 'true'
         uses: actions/upload-artifact@v4
@@ -73,7 +92,7 @@ jobs:
         run: flutter build apk --debug
 
       - name: Build release APK
-        if: env.HAS_RELEASE_KEYSTORE == 'true'
+        if: env.HAS_RELEASE_SIGNING == 'true' && env.RELEASE_SIGNING_VALID == 'true'
         env:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -88,7 +107,7 @@ jobs:
           retention-days: 30
 
       - name: Upload release APK
-        if: env.HAS_RELEASE_KEYSTORE == 'true'
+        if: env.HAS_RELEASE_SIGNING == 'true' && env.RELEASE_SIGNING_VALID == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: app-release
