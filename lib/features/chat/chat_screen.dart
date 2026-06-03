@@ -54,9 +54,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         .where((t) => t.isNotEmpty)
         .join('\n\n');
     final lastMessage = state.messages.isNotEmpty ? state.messages.last : null;
-    final showThinkingBubble = state.isStreaming &&
-        pendingText.isEmpty &&
-        (lastMessage == null || lastMessage.role == MessageRole.user);
+    final showThinkingBubble = state.isStreaming && pendingText.isEmpty;
     final showTailBubble = pendingText.isNotEmpty || showThinkingBubble;
     final isBusy = state.isSending || state.isStreaming;
 

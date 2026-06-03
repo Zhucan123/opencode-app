@@ -291,7 +291,7 @@ class ChatController extends StateNotifier<ChatState> {
         // 否则继续认为是 streaming 状态
         state = state.copyWith(
           isStreaming: true,
-          processingLabel: 'OpenCode 正在思考...',
+          processingLabel: state.processingLabel ?? 'OpenCode 正在思考...',
           clearError: true,
         );
         return;
@@ -306,7 +306,7 @@ class ChatController extends StateNotifier<ChatState> {
         // messages 列表由 REST API 维护，SSE 只做流式内容展示
         state = state.copyWith(
           isStreaming: true,
-          processingLabel: 'OpenCode 正在思考...',
+          processingLabel: state.processingLabel ?? 'OpenCode 正在思考...',
           clearError: true,
         );
         return;
