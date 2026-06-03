@@ -661,7 +661,7 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
               fontFamily: 'monospace',
               fontSize: 12,
               color: Color(0xFFEF9A9A),
-              backgroundColor: Color(0x22F44336),
+              backgroundColor: Color(0x44F44336),
             ),
           ));
         } else if (op.op == 1) {
@@ -671,7 +671,7 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
               fontFamily: 'monospace',
               fontSize: 12,
               color: Color(0xFFA5D6A7),
-              backgroundColor: Color(0x224CAF50),
+              backgroundColor: Color(0x444CAF50),
             ),
           ));
         } else {
