@@ -113,25 +113,25 @@ class MessagePart {
 class FileDiff {
   const FileDiff({
     required this.file,
-    required this.before,
-    required this.after,
+    required this.patch,
     required this.additions,
     required this.deletions,
+    this.status,
   });
 
   final String file;
-  final String before;
-  final String after;
+  final String patch;
   final int additions;
   final int deletions;
+  final String? status;
 
   factory FileDiff.fromJson(Map<String, dynamic> json) {
     return FileDiff(
       file: json['file']?.toString() ?? '',
-      before: json['before']?.toString() ?? '',
-      after: json['after']?.toString() ?? '',
+      patch: json['patch']?.toString() ?? '',
       additions: json['additions'] as int? ?? 0,
       deletions: json['deletions'] as int? ?? 0,
+      status: json['status']?.toString(),
     );
   }
 }

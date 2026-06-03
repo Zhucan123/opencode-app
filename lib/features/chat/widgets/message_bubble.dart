@@ -4,7 +4,6 @@ import 'package:code_app/core/api/models/message.dart';
 import 'package:code_app/features/chat/markdown/code_element_builder.dart';
 import 'package:code_app/features/connection/connection_provider.dart';
 import 'package:code_app/shared/theme.dart';
-import 'package:diff_match_patch/diff_match_patch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -587,127 +586,16 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
   }
 
   Widget _buildDiffContent(BuildContext context, List<FileDiff> diffs) {
-    const contextLines = 3;
     const maxLinesPerFile = 120;
     const bgColor = Color(0xFF1E1E1E);
 
     final fileWidgets = <Widget>[];
 
     for (final diff in diffs) {
-      // 手动实现行级 diff（0.4.1 无 diff_linesToChars）
-      final dmp = DiffMatchPatch();
-      final beforeLines = diff.before.split('\n');
-      final afterLines = diff.after.split('\n');
-      final lineToChar = <String, int>{};
-      final lineArray = <String>[''];
-      final sb1 = StringBuffer();
-      final sb2 = StringBuffer();
-      for (final line in [...beforeLines, ...afterLines]) {
-        if (!lineToChar.containsKey(line)) {
-          lineToChar[line] = lineArray.length;
-          lineArray.add(line);
-        }
-      }
-      for (final line in beforeLines) {
-        sb1.writeCharCode(lineToChar[line]!);
-      }
-      for (final line in afterLines) {
-        sb2.writeCharCode(lineToChar[line]!);
-      }
-      final diffs2 = dmp.diff(sb1.toString(), sb2.toString(), false);
-      dmp.diffCleanupSemantic(diffs2);
+      if (diff.patch.isEmpty) continue;
 
-      // 转换为行操作列表
-      final ops = <_DiffLine>[];
-      for (final d in diffs2) {
-        for (final cu in d.text.codeUnits) {
-          ops.add(_DiffLine(op: d.operation, text: lineArray[cu]));
-        }
-      }
-
-      // 计算哪些行需要显示（变更行 + 前后 contextLines 行）
-      final changed = <int>{};
-      for (var i = 0; i < ops.length; i++) {
-        if (ops[i].op != 0) {
-          for (var j = (i - contextLines).clamp(0, ops.length - 1);
-              j <= (i + contextLines).clamp(0, ops.length - 1);
-              j++) {
-            changed.add(j);
-          }
-        }
-      }
-
-      if (changed.isEmpty) continue; // 文件无变化跳过
-
-      final spans = <TextSpan>[];
-      var shownLines = 0;
-      var lastShown = -2;
-
-      for (var i = 0; i < ops.length && shownLines < maxLinesPerFile; i++) {
-        if (!changed.contains(i)) continue;
-
-        if (i > lastShown + 1) {
-          // 折叠间隔
-          spans.add(TextSpan(
-            text: '@@ ... @@\n',
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 11,
-              color: AppColors.textMuted.withOpacity(0.6),
-            ),
-          ));
-        }
-        lastShown = i;
-
-        final op = ops[i];
-        if (op.op == -1) {
-          spans.add(TextSpan(
-            text: '-${op.text}\n',
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-              color: Color(0xFFEF9A9A),
-              backgroundColor: Color(0x44F44336),
-            ),
-          ));
-        } else if (op.op == 1) {
-          spans.add(TextSpan(
-            text: '+${op.text}\n',
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-              color: Color(0xFFA5D6A7),
-              backgroundColor: Color(0x444CAF50),
-            ),
-          ));
-        } else {
-          spans.add(TextSpan(
-            text: ' ${op.text}\n',
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-              color: Colors.white54,
-            ),
-          ));
-        }
-        shownLines++;
-      }
-
-      if (shownLines >= maxLinesPerFile) {
-        spans.add(TextSpan(
-          text: '... (内容过长，已截断)\n',
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 11,
-            color: AppColors.textMuted.withOpacity(0.6),
-          ),
-        ));
-      }
-
-      // 文件头
-      final shortName = diff.file.contains('/')
-          ? diff.file.split('/').last
-          : diff.file;
+      final spans = _parsePatchToSpans(diff.patch, maxLinesPerFile);
+      if (spans.isEmpty) continue;
 
       fileWidgets.add(Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -784,12 +672,73 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
       ),
     );
   }
-}
 
-class _DiffLine {
-  const _DiffLine({required this.op, required this.text});
-  final int op; // -1 delete, 0 equal, 1 insert
-  final String text;
+  List<TextSpan> _parsePatchToSpans(String patch, int maxLines) {
+    final spans = <TextSpan>[];
+    var shownLines = 0;
+
+    for (final line in patch.split('\n')) {
+      if (shownLines >= maxLines) {
+        spans.add(TextSpan(
+          text: '... (内容过长，已截断)\n',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            color: AppColors.textMuted.withOpacity(0.6),
+          ),
+        ));
+        break;
+      }
+
+      if (line.startsWith('---') || line.startsWith('+++')) {
+        // skip file header lines
+        continue;
+      } else if (line.startsWith('@@')) {
+        spans.add(TextSpan(
+          text: '$line\n',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            color: AppColors.textMuted.withOpacity(0.6),
+          ),
+        ));
+      } else if (line.startsWith('-')) {
+        spans.add(TextSpan(
+          text: '$line\n',
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 12,
+            color: Color(0xFFEF9A9A),
+            backgroundColor: Color(0x44F44336),
+          ),
+        ));
+        shownLines++;
+      } else if (line.startsWith('+')) {
+        spans.add(TextSpan(
+          text: '$line\n',
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 12,
+            color: Color(0xFFA5D6A7),
+            backgroundColor: Color(0x444CAF50),
+          ),
+        ));
+        shownLines++;
+      } else {
+        spans.add(TextSpan(
+          text: '$line\n',
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 12,
+            color: Colors.white54,
+          ),
+        ));
+        shownLines++;
+      }
+    }
+
+    return spans;
+  }
 }
 
 class _TodoCard extends StatefulWidget {
