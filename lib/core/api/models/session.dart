@@ -9,6 +9,8 @@ class OpencodeSession {
     this.state,
     this.agent,
     this.modelId,
+    this.cost,
+    this.totalTokens,
   });
 
   final String id;
@@ -20,6 +22,8 @@ class OpencodeSession {
   final String? state;
   final String? agent;
   final String? modelId;
+  final double? cost;
+  final int? totalTokens;
 
   bool get isSubAgent => parentId != null && parentId!.isNotEmpty;
 
@@ -31,20 +35,35 @@ class OpencodeSession {
       modelId = json['model'].toString();
     }
 
+    final timeJson = json['time'] is Map ? json['time'] : null;
+    final rawCreated = timeJson?['created'] ?? json['createdAt'] ?? json['created_at'];
+    final rawUpdated = timeJson?['updated'] ?? json['updatedAt'] ?? json['updated_at'];
+
+    int? totalTokens;
+    if (json['tokens'] is Map) {
+      final t = json['tokens'] as Map;
+      final input = (t['input'] as num?)?.toInt() ?? 0;
+      final output = (t['output'] as num?)?.toInt() ?? 0;
+      final reasoning = (t['reasoning'] as num?)?.toInt() ?? 0;
+      totalTokens = input + output + reasoning;
+    }
+
     return OpencodeSession(
       id: json['id']?.toString() ?? '',
       title: (json['title']?.toString().trim().isNotEmpty ?? false)
           ? json['title'].toString().trim()
           : 'Untitled Session',
       parentId: json['parentID']?.toString() ?? json['parentId']?.toString(),
-      createdAt: _parseDate(json['createdAt'] ?? json['created_at']),
-      updatedAt: _parseDate(json['updatedAt'] ?? json['updated_at']),
+      createdAt: _parseDate(rawCreated),
+      updatedAt: _parseDate(rawUpdated),
       preview: json['preview']?.toString() ??
           json['lastMessagePreview']?.toString() ??
           json['last_message_preview']?.toString(),
       state: json['state']?.toString(),
       agent: json['agent']?.toString(),
       modelId: modelId,
+      cost: (json['cost'] as num?)?.toDouble(),
+      totalTokens: totalTokens,
     );
   }
 
@@ -56,12 +75,18 @@ class OpencodeSession {
       'updatedAt': updatedAt?.toIso8601String(),
       'preview': preview,
       'state': state,
+      'cost': cost,
+      'totalTokens': totalTokens,
     };
   }
 
   static DateTime? _parseDate(Object? raw) {
     if (raw == null) {
       return null;
+    }
+    
+    if (raw is num) {
+      return DateTime.fromMillisecondsSinceEpoch(raw.toInt()).toLocal();
     }
 
     return DateTime.tryParse(raw.toString())?.toLocal();

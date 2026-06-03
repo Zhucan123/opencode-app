@@ -188,49 +188,161 @@ class _SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(session.title, style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    Text(
-                      session.preview?.trim().isNotEmpty == true
-                          ? session.preview!.trim()
-                          : '点击进入对话',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textMuted,
+    return Dismissible(
+      key: ValueKey(session.id),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => onDelete(),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        decoration: BoxDecoration(
+          color: AppColors.danger.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+      ),
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 标题
+                Text(
+                  session.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+
+                // 标签行
+                if (session.agent != null || session.modelId != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (session.agent != null)
+                          _buildTag(
+                            context,
+                            icon: Icons.smart_toy_outlined,
+                            text: session.agent!,
+                            color: AppColors.accent,
                           ),
+                        if (session.modelId != null)
+                          _buildTag(
+                            context,
+                            icon: Icons.auto_awesome_outlined,
+                            text: session.modelId!,
+                            color: Colors.purpleAccent,
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                  ),
+
+                // 预览文本
+                Text(
+                  session.preview?.trim().isNotEmpty == true
+                      ? session.preview!.trim()
+                      : '点击进入对话...',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textMuted,
+                        height: 1.4,
+                      ),
+                ),
+                const SizedBox(height: 12),
+
+                // 底部信息栏（时间 + 消耗）
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
                     Text(
                       _formatTime(session.updatedAt ?? session.createdAt),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    if (session.cost != null || session.totalTokens != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (session.totalTokens != null && session.totalTokens! > 0)
+                            Text(
+                              _formatTokens(session.totalTokens!),
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppColors.textMuted.withOpacity(0.5),
+                                    fontSize: 11,
+                                  ),
+                            ),
+                          if (session.totalTokens != null && session.totalTokens! > 0 && session.cost != null && session.cost! > 0)
+                            Text(
+                              ' • ',
+                              style: TextStyle(color: AppColors.textMuted.withOpacity(0.5), fontSize: 11),
+                            ),
+                          if (session.cost != null && session.cost! > 0)
+                            Text(
+                              '\$${session.cost!.toStringAsFixed(3)}',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppColors.textMuted.withOpacity(0.8),
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 11,
+                                  ),
+                            ),
+                        ],
+                      ),
                   ],
                 ),
-              ),
-              IconButton(
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: '删除会话',
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildTag(BuildContext context, {required IconData icon, required String text, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatTokens(int tokens) {
+    if (tokens < 1000) return '$tokens tkns';
+    if (tokens < 1000000) return '${(tokens / 1000).toStringAsFixed(1)}k tkns';
+    return '${(tokens / 1000000).toStringAsFixed(2)}M tkns';
   }
 
   static String _formatTime(DateTime? value) {
@@ -259,15 +371,24 @@ class _EmptySessionState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Icon(Icons.chat_bubble_outline_rounded, size: 48, color: AppColors.textMuted),
-        const SizedBox(height: 16),
-        Text('还没有会话', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: const Icon(Icons.rocket_launch_rounded, size: 48, color: AppColors.accent),
+        ),
+        const SizedBox(height: 24),
+        Text('一切准备就绪', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
         Text(
-          '点击右下角按钮创建第一个 OpenCode 会话。',
+          '点击右下角按钮\n开启你的第一个 OpenCode 编程会话',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppColors.textMuted,
+                height: 1.5,
               ),
         ),
       ],
