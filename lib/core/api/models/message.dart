@@ -33,7 +33,7 @@ enum MessagePartType {
       'markdown' => MessagePartType.markdown,
       'code' => MessagePartType.code,
       'patch' => MessagePartType.patch,
-      'tool_call' || 'toolCall' => MessagePartType.toolCall,
+      'tool' || 'tool_call' || 'toolCall' => MessagePartType.toolCall,
       'tool_result' || 'toolResult' => MessagePartType.toolResult,
       'step-start' => MessagePartType.stepStart,
       'step-finish' => MessagePartType.stepFinish,

@@ -95,13 +95,14 @@ class _AssistantMessageMarkdown extends StatelessWidget {
       } else if (part.type == MessagePartType.code) {
         final lang = part.language ?? '';
         textBuffer.writeln('```$lang\n${part.text}\n```\n');
-      } else if (part.type == MessagePartType.toolCall ||
-                 part.type == MessagePartType.stepStart) {
+      } else if (part.type == MessagePartType.toolCall) {
         flushText();
         children.add(Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: _ToolExecutionCard(part: part),
         ));
+      } else if (part.type == MessagePartType.stepStart || part.type == MessagePartType.stepFinish) {
+        // 忽略底层的 step 事件，避免界面杂乱
       } else if (part.type == MessagePartType.toolResult) {
         flushText();
         children.add(Padding(
@@ -171,9 +172,11 @@ class _ToolExecutionCard extends StatelessWidget {
     final raw = part.rawJson ?? {};
 
     // 尝试多种字段名，兼容不同版本的 opencode API
-    final rawToolName = raw['toolName']?.toString() ??
+    final rawToolName = raw['tool_name']?.toString() ??
+        raw['toolName']?.toString() ??
         raw['tool']?.toString() ??
         raw['name']?.toString() ??
+        (raw['tool_call'] is Map ? raw['tool_call']['name']?.toString() : null) ??
         '执行工具';
 
     String displayToolName;
@@ -225,8 +228,11 @@ class _ToolExecutionCard extends StatelessWidget {
         toolIcon = Icons.build_circle_outlined;
     }
 
+    final stateObj = raw['state'] is Map ? raw['state'] as Map : null;
+
     // 工具的详细入参：input / args / command / text，展示 JSON 或字符串
-    final inputRaw = raw['input'] ?? raw['args'] ?? raw['command'];
+    final inputObj = stateObj != null ? stateObj['input'] : null;
+    final inputRaw = inputObj ?? raw['input'] ?? raw['args'] ?? raw['command'];
     String detail;
     if (inputRaw is Map || inputRaw is List) {
       const encoder = JsonEncoder.withIndent('  ');
@@ -237,6 +243,17 @@ class _ToolExecutionCard extends StatelessWidget {
       detail = part.text;
     } else {
       detail = raw.isNotEmpty ? const JsonEncoder.withIndent('  ').convert(raw) : '(无详情)';
+    }
+    
+    // 尝试提取结果文本
+    final resultRaw = (stateObj != null ? stateObj['output'] : null) ?? raw['result'] ?? raw['output'] ?? raw['stdout'];
+    String? resultDetail;
+    if (resultRaw != null) {
+      if (resultRaw is Map || resultRaw is List) {
+        resultDetail = const JsonEncoder.withIndent('  ').convert(resultRaw);
+      } else {
+        resultDetail = resultRaw.toString();
+      }
     }
     
     return Container(
@@ -262,6 +279,8 @@ class _ToolExecutionCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (resultDetail != null)
+                const Icon(Icons.check_circle, size: 14, color: Colors.green),
             ],
           ),
           children: [
@@ -272,13 +291,33 @@ class _ToolExecutionCard extends StatelessWidget {
                 color: Color(0xFF1E1E1E),
                 borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
               ),
-              child: SelectableText(
-                detail,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  color: Colors.white70,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('输入 (Input):', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                  const SizedBox(height: 4),
+                  SelectableText(
+                    detail,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  if (resultDetail != null) ...[
+                    const Divider(color: Colors.white24, height: 24),
+                    Text('输出 (Output):', style: TextStyle(fontSize: 12, color: Colors.green[300])),
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      resultDetail,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
