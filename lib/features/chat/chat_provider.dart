@@ -206,7 +206,7 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(String text, {List<Map<String, dynamic>>? extraParts}) async {
     final connection = ref.read(activeConnectionProvider(args.serverId));
     if (connection == null) {
       state = state.copyWith(error: '连接已断开，无法发送消息。');
@@ -214,14 +214,31 @@ class ChatController extends StateNotifier<ChatState> {
     }
 
     final trimmed = text.trim();
-    if (trimmed.isEmpty || state.isSending) return;
+    if (trimmed.isEmpty && (extraParts == null || extraParts.isEmpty)) return;
+    if (state.isSending) return;
 
     // 乐观插入用户消息
+    final userParts = <MessagePart>[];
+    if (trimmed.isNotEmpty) {
+      userParts.add(MessagePart(type: MessagePartType.text, text: trimmed));
+    }
+    if (extraParts != null) {
+      for (final part in extraParts) {
+        if (part['type'] == 'image') {
+          userParts.add(MessagePart(
+            type: MessagePartType.image,
+            text: '[图片]',
+            rawJson: part,
+          ));
+        }
+      }
+    }
+
     final optimistic = OpencodeMessage(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
       sessionId: args.sessionId,
       role: MessageRole.user,
-      parts: [MessagePart(type: MessagePartType.text, text: trimmed)],
+      parts: userParts,
       createdAt: DateTime.now(),
     );
 
@@ -239,6 +256,7 @@ class ChatController extends StateNotifier<ChatState> {
         mode: state.selectedMode,
         modelId: state.selectedModel?.id,
         providerId: state.selectedModel?.providerId,
+        extraParts: extraParts,
       );
       state = state.copyWith(
         isSending: false,

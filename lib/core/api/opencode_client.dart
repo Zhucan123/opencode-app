@@ -86,9 +86,17 @@ class OpencodeClient {
   }
 
   Future<void> sendPrompt(String sessionId, String text,
-      {String? mode, String? modelId, String? providerId}) async {
+      {String? mode, String? modelId, String? providerId, List<Map<String, dynamic>>? extraParts}) async {
+    final parts = <Map<String, dynamic>>[];
+    if (text.isNotEmpty) {
+      parts.add({'type': 'text', 'text': text});
+    }
+    if (extraParts != null) {
+      parts.addAll(extraParts);
+    }
+    
     final data = <String, dynamic>{
-      'parts': [{'type': 'text', 'text': text}],
+      'parts': parts,
     };
     if (mode != null && mode.isNotEmpty) data['agent'] = mode;
     // model 必须嵌套在 model 对象里，不能放顶层

@@ -121,6 +121,15 @@ class _AssistantMessageMarkdown extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: _DiffPreviewCard(part: part),
         ));
+      } else if (part.type == MessagePartType.image) {
+        flushText();
+        final imgUrl = part.imageUrl;
+        if (imgUrl != null) {
+          children.add(Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: _ImageCard(imageUrl: imgUrl),
+          ));
+        }
       } else {
         // Fallback for other unknown types, try to display text if present
         if (part.text.isNotEmpty) {
@@ -534,6 +543,33 @@ class _ReasoningCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ImageCard extends StatelessWidget {
+  const _ImageCard({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget imageWidget;
+    if (imageUrl.startsWith('data:image')) {
+      final b64 = imageUrl.split(',').last;
+      imageWidget = Image.memory(base64Decode(b64), fit: BoxFit.cover);
+    } else if (imageUrl.startsWith('http')) {
+      imageWidget = Image.network(imageUrl, fit: BoxFit.cover);
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 300),
+        child: imageWidget,
       ),
     );
   }

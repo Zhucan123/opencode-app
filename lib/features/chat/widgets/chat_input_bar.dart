@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'package:code_app/core/api/opencode_client.dart';
 import 'package:code_app/shared/theme.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +18,7 @@ class ChatInputBar extends StatefulWidget {
     this.onModelSelected,
   });
 
-  final Future<void> Function(String text) onSend;
+  final Future<void> Function(String text, {List<Map<String, dynamic>>? extraParts}) onSend;
   final VoidCallback? onAbort;
   final bool isBusy;
   final List<String> availableModes;
@@ -32,6 +34,7 @@ class ChatInputBar extends StatefulWidget {
 
 class _ChatInputBarState extends State<ChatInputBar> {
   late final TextEditingController _controller;
+  final List<Map<String, dynamic>> _extraParts = [];
 
   @override
   void initState() {
@@ -43,6 +46,42 @@ class _ChatInputBarState extends State<ChatInputBar> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: true,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      setState(() {
+        for (final file in result.files) {
+          if (file.bytes == null) continue;
+          final base64String = base64Encode(file.bytes!);
+          final ext = file.extension?.toLowerCase();
+          final mediaType = ext == 'png' ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
+          _extraParts.add({
+            'type': 'image',
+            'source': {
+              'type': 'base64',
+              'media_type': mediaType,
+              'data': base64String,
+            }
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  void _removeExtraPart(int index) {
+    setState(() {
+      _extraParts.removeAt(index);
+    });
   }
 
   @override
@@ -83,10 +122,61 @@ class _ChatInputBarState extends State<ChatInputBar> {
               ),
               const SizedBox(height: 8),
             ],
+            // 已选图片预览行
+            if (_extraParts.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: List.generate(_extraParts.length, (index) {
+                    final part = _extraParts[index];
+                    final b64 = part['source']['data'] as String;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.border),
+                            image: DecorationImage(
+                              image: MemoryImage(base64Decode(b64)),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: -6,
+                          right: -6,
+                          child: GestureDetector(
+                            onTap: () => _removeExtraPart(index),
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: AppColors.card,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close_rounded, size: 14, color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ),
             // 输入行：全宽输入框 + 发送按钮
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                IconButton(
+                  icon: const Icon(Icons.add_photo_alternate_outlined, color: AppColors.textMuted),
+                  onPressed: widget.isBusy ? null : _pickImage,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
+                ),
                 Expanded(
                   child: TextField(
                     controller: _controller,
@@ -128,9 +218,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   Future<void> _handleSend() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _extraParts.isEmpty) return;
+    final partsToSend = List<Map<String, dynamic>>.from(_extraParts);
     _controller.clear();
-    await widget.onSend(text);
+    setState(() {
+      _extraParts.clear();
+    });
+    await widget.onSend(text, extraParts: partsToSend);
   }
 }
 

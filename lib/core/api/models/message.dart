@@ -26,6 +26,7 @@ enum MessagePartType {
   stepStart,
   stepFinish,
   reasoning,
+  image,
   unknown;
 
   static MessagePartType fromJson(Object? value) {
@@ -39,6 +40,7 @@ enum MessagePartType {
       'step-start' => MessagePartType.stepStart,
       'step-finish' => MessagePartType.stepFinish,
       'reasoning' || 'thought' => MessagePartType.reasoning,
+      'image' || 'image_url' => MessagePartType.image,
       _ => MessagePartType.unknown,
     };
   }
@@ -56,6 +58,24 @@ class MessagePart {
   final String text;
   final String? language;
   final Map<String, dynamic>? rawJson;
+
+  String? get imageUrl {
+    if (type != MessagePartType.image || rawJson == null) return null;
+    
+    // {"type": "image_url", "image_url": {"url": "..."}}
+    if (rawJson!['image_url'] is Map && rawJson!['image_url']['url'] != null) {
+      return rawJson!['image_url']['url'].toString();
+    }
+    
+    // {"type": "image", "source": {"type": "base64", "media_type": "...", "data": "..."}}
+    if (rawJson!['source'] is Map && rawJson!['source']['data'] != null) {
+      final mediaType = rawJson!['source']['media_type'] ?? 'image/jpeg';
+      final base64Data = rawJson!['source']['data'];
+      return 'data:$mediaType;base64,$base64Data';
+    }
+    
+    return null;
+  }
 
   factory MessagePart.fromJson(Object? raw) {
     if (raw is String) {

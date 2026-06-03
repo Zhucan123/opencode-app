@@ -142,7 +142,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             availableModels: state.availableModels,
             selectedModel: state.selectedModel,
             onModelSelected: (model) => ref.read(chatProvider(args).notifier).setModel(model),
-            onSend: (text) => ref.read(chatProvider(args).notifier).sendMessage(text),
+            onSend: (text, {extraParts}) => ref.read(chatProvider(args).notifier).sendMessage(text, extraParts: extraParts),
             onAbort: () => ref.read(chatProvider(args).notifier).abort(),
           ),
         ],
