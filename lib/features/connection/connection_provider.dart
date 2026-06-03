@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:code_app/core/api/models/event.dart';
 import 'package:code_app/core/api/opencode_client.dart';
 import 'package:code_app/core/api/sse_client.dart';
@@ -10,6 +11,7 @@ enum ConnectionStatus {
   idle,
   connecting,
   connected,
+  reconnecting,
   disconnected,
   error,
 }
@@ -44,6 +46,7 @@ class ConnectionViewState {
 
   bool get isConnected => status == ConnectionStatus.connected;
   bool get isConnecting => status == ConnectionStatus.connecting;
+  bool get isReconnecting => status == ConnectionStatus.reconnecting;
 
   ConnectionViewState copyWith({
     ConnectionStatus? status,
@@ -201,6 +204,68 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
         status: ConnectionStatus.error,
         step: state.step,
         localPort: localPort,
+        errorMessage: _friendlyError(error),
+      );
+    }
+  }
+
+  Future<void> healthCheckAndReconnect() async {
+    if (state.isConnecting || state.isReconnecting) return;
+
+    final existing = ref.read(activeConnectionProvider(serverId));
+    if (existing != null) {
+      try {
+        await existing.apiClient.getSessions().timeout(const Duration(seconds: 3));
+        return; // still healthy
+      } catch (_) {
+        // unhealthy — tear down and reconnect silently
+      }
+    }
+
+    state = state.copyWith(status: ConnectionStatus.reconnecting, clearError: true);
+    await ref.read(connectionRegistryProvider.notifier).remove(serverId);
+
+    final store = ref.read(serverConfigStoreProvider);
+    final server = await store.getServer(serverId);
+    if (server == null) {
+      state = state.copyWith(
+        status: ConnectionStatus.error,
+        errorMessage: '未找到服务器配置。',
+      );
+      return;
+    }
+
+    final localPort = _allocateLocalPort(ref.read(connectionRegistryProvider));
+    ManagedSshConnection? sshConnection;
+    OpencodeClient? apiClient;
+    try {
+      sshConnection = await _sshClient.connect(
+        server: server,
+        localPort: localPort,
+        onStageChanged: (_) {},
+      );
+      apiClient = OpencodeClient(port: localPort);
+      await apiClient.getSessions();
+      final sseClient = SseClient(dio: apiClient.dio);
+
+      ref.read(connectionRegistryProvider.notifier).upsert(ActiveConnection(
+            serverId: serverId,
+            localPort: localPort,
+            sshConnection: sshConnection,
+            apiClient: apiClient,
+            sseClient: sseClient,
+          ));
+
+      state = ConnectionViewState(
+        status: ConnectionStatus.connected,
+        step: ConnectionStep.ready,
+        localPort: localPort,
+      );
+    } catch (error) {
+      apiClient?.dispose();
+      if (sshConnection != null) await sshConnection.close();
+      state = state.copyWith(
+        status: ConnectionStatus.error,
         errorMessage: _friendlyError(error),
       );
     }

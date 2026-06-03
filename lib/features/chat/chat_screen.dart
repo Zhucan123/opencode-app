@@ -3,6 +3,7 @@ import 'package:code_app/features/chat/widgets/chat_input_bar.dart';
 import 'package:code_app/features/chat/widgets/message_bubble.dart';
 import 'package:code_app/features/chat/widgets/permission_sheet.dart';
 import 'package:code_app/features/chat/markdown/code_element_builder.dart';
+import 'package:code_app/features/connection/connection_provider.dart';
 import 'package:code_app/features/sessions/session_provider.dart';
 import 'package:code_app/shared/theme.dart';
 import 'package:code_app/core/api/models/event.dart';
@@ -47,7 +48,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       sessionId: widget.sessionId,
     );
     final state = ref.watch(chatProvider(args));
-    final title = _sessionTitle();
+    final connState = ref.watch(connectionProvider(widget.serverId));
+    final isReconnecting = connState.isReconnecting;
+    final title = isReconnecting ? '恢复连接中...' : _sessionTitle();
     final existingIds = state.messages.map((m) => m.id).toSet();
     final pendingText = state.streamingParts.entries
         .where((e) => !existingIds.contains(e.key))
@@ -57,7 +60,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final lastMessage = state.messages.isNotEmpty ? state.messages.last : null;
     final showThinkingBubble = state.isStreaming && pendingText.isEmpty;
     final showTailBubble = pendingText.isNotEmpty || showThinkingBubble;
-    final isBusy = state.isSending || state.isStreaming;
+    final isBusy = state.isSending || state.isStreaming || isReconnecting;
 
     ref.listen<ChatState>(chatProvider(args), (prev, next) {
       if (next.error != null && mounted) {
@@ -75,7 +78,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isReconnecting) ...[
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Text(title),
+          ],
+        ),
         actions: [
           if (state.messages.isNotEmpty && !isBusy)
             IconButton(
