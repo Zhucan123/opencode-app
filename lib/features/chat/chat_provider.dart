@@ -111,6 +111,13 @@ final chatProvider = StateNotifierProvider.autoDispose
 class ChatController extends StateNotifier<ChatState> {
   ChatController(this.ref, this.args) : super(const ChatState(isLoading: true)) {
     _initialize();
+    
+    // 监听底层连接的热替换，实现无缝重连
+    ref.listen<ActiveConnection?>(activeConnectionProvider(args.serverId), (previous, next) {
+      if (previous != next && next != null) {
+        _swapConnection(next);
+      }
+    });
   }
 
   final Ref ref;
@@ -122,6 +129,18 @@ class ChatController extends StateNotifier<ChatState> {
   Timer? _streamStopTimer;
   // 用户消息的真实 ID（服务端分配），用于过滤掉用户侧 part 事件
   final Set<String> _userMessageIds = {};
+
+  void _swapConnection(ActiveConnection newConnection) {
+    _subscription?.cancel();
+    _subscription = newConnection.events.listen(
+      _handleEvent,
+      onError: (Object error, StackTrace _) {
+        state = state.copyWith(isStreaming: false, error: error.toString());
+      },
+    );
+    // 顺便刷新一下消息
+    refreshMessages(stopStreaming: false);
+  }
 
   Future<void> _initialize() async {
     final connection = ref.read(activeConnectionProvider(args.serverId));

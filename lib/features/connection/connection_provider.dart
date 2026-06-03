@@ -125,6 +125,38 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
   final Ref ref;
   final String serverId;
   final OpencodeSshClient _sshClient = OpencodeSshClient();
+  
+  Timer? _heartbeatTimer;
+
+  @override
+  void dispose() {
+    _heartbeatTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startMonitoring(ManagedSshConnection sshConnection) {
+    _heartbeatTimer?.cancel();
+    
+    // 被动监听底层连接断开
+    sshConnection.client.done.then((_) {
+      if (mounted && state.isConnected) {
+        healthCheckAndReconnect();
+      }
+    }).catchError((_) {});
+
+    sshConnection.opencodeSession.done.then((_) {
+      if (mounted && state.isConnected) {
+        healthCheckAndReconnect();
+      }
+    }).catchError((_) {});
+
+    // 主动应用层心跳（每 15 秒）
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted && state.isConnected) {
+        healthCheckAndReconnect();
+      }
+    });
+  }
 
   Future<void> connect() async {
     if (state.isConnecting) {
@@ -195,6 +227,8 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
         step: ConnectionStep.ready,
         localPort: localPort,
       );
+      
+      _startMonitoring(sshConnection);
     } catch (error) {
       apiClient?.dispose();
       if (sshConnection != null) {
@@ -261,6 +295,8 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
         step: ConnectionStep.ready,
         localPort: localPort,
       );
+      
+      _startMonitoring(sshConnection);
     } catch (error) {
       apiClient?.dispose();
       if (sshConnection != null) await sshConnection.close();
@@ -272,6 +308,7 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
   }
 
   Future<void> disconnect() async {
+    _heartbeatTimer?.cancel();
     await ref.read(connectionRegistryProvider.notifier).remove(serverId);
     state = const ConnectionViewState.idle().copyWith(
       status: ConnectionStatus.disconnected,
