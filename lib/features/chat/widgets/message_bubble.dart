@@ -127,7 +127,7 @@ class _AssistantMessageMarkdown extends StatelessWidget {
         final inputObj = stateObj != null ? stateObj['input'] : raw['input'] ?? raw['args'];
         final isTodo = toolName.toLowerCase() == 'todowrite';
         children.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
           child: isTodo
               ? _TodoCard(input: inputObj)
               : _ToolExecutionCard(part: part),
@@ -137,14 +137,14 @@ class _AssistantMessageMarkdown extends StatelessWidget {
       } else if (part.type == MessagePartType.toolResult) {
         flushText();
         children.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
           child: _ToolResultCard(part: part),
         ));
       } else if (part.type == MessagePartType.patch) {
         flushText();
         final messageId = part.rawJson?['messageID']?.toString() ?? message.id;
         children.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
           child: _DiffPreviewCard(
             serverId: serverId,
             sessionId: sessionId,
@@ -160,7 +160,7 @@ class _AssistantMessageMarkdown extends StatelessWidget {
         final imgUrl = part.imageUrl;
         if (imgUrl != null) {
           children.add(Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: _ImageCard(imageUrl: imgUrl),
           ));
         }
@@ -316,6 +316,8 @@ class _ToolExecutionCard extends StatelessWidget {
         child: ExpansionTile(
           collapsedIconColor: AppColors.textMuted,
           iconColor: AppColors.textPrimary,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+          minTileHeight: 38,
           title: Row(
             children: [
               Icon(toolIcon, size: 18, color: AppColors.accent),
@@ -410,9 +412,11 @@ class _ToolResultCard extends StatelessWidget {
         child: ExpansionTile(
           collapsedIconColor: AppColors.textMuted,
           iconColor: AppColors.textPrimary,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+          minTileHeight: 38,
           title: Row(
             children: [
-              const Icon(Icons.check_circle_outline, size: 18, color: Colors.green),
+              const Icon(Icons.output_rounded, size: 18, color: Colors.green),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -517,7 +521,7 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
                 : null,
             borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Row(
                 children: [
                   const Icon(Icons.difference_outlined, size: 18, color: AppColors.accent),
@@ -679,7 +683,7 @@ class _TodoCardState extends State<_TodoCard> {
             onTap: todos.isNotEmpty ? () => setState(() => _expanded = !_expanded) : null,
             borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Row(
                 children: [
                   const Icon(Icons.checklist_rtl_rounded, size: 18, color: AppColors.accent),
@@ -849,8 +853,8 @@ class _ReasoningCard extends StatelessWidget {
           initiallyExpanded: false,
           collapsedIconColor: AppColors.textMuted,
           iconColor: AppColors.textMuted,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-          minTileHeight: 40,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+          minTileHeight: 38,
           title: Row(
             children: [
               const Icon(Icons.psychology_outlined, size: 16, color: AppColors.textMuted),
