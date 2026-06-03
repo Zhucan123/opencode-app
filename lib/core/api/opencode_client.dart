@@ -125,24 +125,39 @@ class OpencodeClient {
     }
   }
 
-  /// 获取可用模型列表（尝试新旧两个路径）
+  /// 获取可用模型列表，从 /provider 提取各 provider 的模型
   Future<List<OpencodeModel>> getModels() async {
-    for (final path in ['/api/model', '/model']) {
-      try {
-        final response = await _dio.get<List<dynamic>>(path);
-        final payload = response.data ?? const <dynamic>[];
-        if (payload.isEmpty) continue;
-        final models = payload
-            .whereType<Map>()
-            .map((m) => OpencodeModel.fromJson(Map<String, dynamic>.from(m)))
-            .where((m) => m.enabled && m.id.isNotEmpty)
-            .toList();
-        if (models.isNotEmpty) return models;
-      } catch (_) {
-        continue;
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/provider');
+      final data = response.data ?? const <String, dynamic>{};
+      final allProviders = data['all'];
+      final connected = (data['connected'] as List?)?.map((e) => e.toString()).toSet() ?? <String>{};
+      if (allProviders is! List) return const [];
+
+      final models = <OpencodeModel>[];
+      for (final p in allProviders) {
+        if (p is! Map) continue;
+        final providerId = p['id']?.toString() ?? '';
+        if (providerId.isEmpty) continue;
+        if (connected.isNotEmpty && !connected.contains(providerId)) continue;
+        final modelsMap = p['models'];
+        if (modelsMap is! Map) continue;
+        for (final entry in modelsMap.entries) {
+          final m = entry.value;
+          if (m is! Map) continue;
+          final model = OpencodeModel.fromJson(
+            Map<String, dynamic>.from(m as Map),
+            providerId: providerId,
+          );
+          if (model.id.isNotEmpty && model.status != 'deprecated') {
+            models.add(model);
+          }
+        }
       }
+      return models;
+    } catch (_) {
+      return const [];
     }
-    return const [];
   }
 
   Future<void> respondToPermission(String sessionId, String permissionId, bool allow, {bool permanent = false}) async {
@@ -185,22 +200,22 @@ class OpencodeModel {
     required this.id,
     required this.name,
     required this.providerId,
-    required this.enabled,
+    this.status = 'active',
   });
 
   final String id;
   final String name;
   final String providerId;
-  final bool enabled;
+  final String status;
 
   String get displayName => name.isNotEmpty ? name : id;
 
-  factory OpencodeModel.fromJson(Map<String, dynamic> json) {
+  factory OpencodeModel.fromJson(Map<String, dynamic> json, {String? providerId}) {
     return OpencodeModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      providerId: json['providerID']?.toString() ?? '',
-      enabled: json['enabled'] as bool? ?? true,
+      providerId: providerId ?? json['providerID']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'active',
     );
   }
 }
