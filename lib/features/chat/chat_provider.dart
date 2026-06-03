@@ -138,11 +138,11 @@ class ChatController extends StateNotifier<ChatState> {
   Timer? _streamStopTimer;
   final Set<String> _userMessageIds = {};
   static const int _pageSize = 20;
-  List<OpencodeMessage> _allMessages = [];
+  int _currentLimit = 20;
+  bool _isLoadingMore = false;
 
-  List<OpencodeMessage> _slice(int count) {
-    if (_allMessages.length <= count) return List.unmodifiable(_allMessages);
-    return List.unmodifiable(_allMessages.sublist(_allMessages.length - count));
+  ChatController(this.args) : super(const ChatState()) {
+    _init();
   }
 
   void _swapConnection(ActiveConnection newConnection) {
@@ -158,15 +158,13 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   Future<void> _initialize() async {
-    final connection = ref.read(activeConnectionProvider(args.serverId));
-    if (connection == null) {
-      state = state.copyWith(isLoading: false, error: '当前服务器尚未建立连接。');
-      return;
-    }
+      final connection = ref.read(activeConnectionProvider(args.serverId));
+      if (connection == null) {
+        state = state.copyWith(isLoading: false, error: '未连接到服务器');
+        return;
+      }
 
-    try {
-      // 分开调用，避免 Future.wait 混合类型在运行时转换失败导致消息加载丢失
-      final messages = await connection.apiClient.getMessages(args.sessionId);
+      final messages = await connection.apiClient.getMessages(args.sessionId, limit: _currentLimit);
       final modes = await connection.apiClient.getModes();
       final models = await connection.apiClient.getModels();
 
@@ -199,11 +197,9 @@ class ChatController extends StateNotifier<ChatState> {
       }
       initialModel ??= models.isNotEmpty ? models.first : null;
 
-      _allMessages = messages;
-      final initialSlice = _slice(_pageSize);
       state = state.copyWith(
-        messages: initialSlice,
-        hasMore: _allMessages.length > initialSlice.length,
+        messages: messages,
+        hasMore: messages.length >= _currentLimit,
         availableModes: modes,
         selectedMode: initialMode,
         availableModels: models,
@@ -237,12 +233,10 @@ class ChatController extends StateNotifier<ChatState> {
     final connection = ref.read(activeConnectionProvider(args.serverId));
     if (connection == null) return;
     try {
-      final messages = await connection.apiClient.getMessages(args.sessionId);
-      _allMessages = messages;
-      final displayCount = state.messages.isEmpty ? _pageSize : state.messages.length.clamp(_pageSize, _allMessages.length);
+      final messages = await connection.apiClient.getMessages(args.sessionId, limit: _currentLimit);
       state = state.copyWith(
-        messages: _slice(displayCount),
-        hasMore: _allMessages.length > displayCount,
+        messages: messages,
+        hasMore: messages.length >= _currentLimit,
         streamingParts: stopStreaming ? const {} : state.streamingParts,
         clearStreamingReasoning: stopStreaming,
         isLoading: false,
@@ -255,13 +249,12 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
-  void loadMore() {
-    if (!state.hasMore) return;
-    final newCount = (state.messages.length + _pageSize).clamp(0, _allMessages.length);
-    state = state.copyWith(
-      messages: _slice(newCount),
-      hasMore: _allMessages.length > newCount,
-    );
+  Future<void> loadMore() async {
+    if (!state.hasMore || _isLoadingMore) return;
+    _isLoadingMore = true;
+    _currentLimit += _pageSize;
+    await refreshMessages();
+    _isLoadingMore = false;
   }
 
   Future<void> sendMessage(String text, {List<Map<String, dynamic>>? extraParts}) async {

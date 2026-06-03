@@ -62,8 +62,12 @@ class OpencodeClient {
   }
 
   /// 加载历史消息，最多返回 [limit] 条（取最新的）
-  Future<List<OpencodeMessage>> getMessages(String sessionId) async {
-    final response = await _dio.get<List<dynamic>>('/session/$sessionId/message');
+  Future<List<OpencodeMessage>> getMessages(String sessionId, {int? limit}) async {
+    final queryParams = limit != null ? {'limit': limit} : null;
+    final response = await _dio.get<List<dynamic>>(
+      '/session/$sessionId/message',
+      queryParameters: queryParams,
+    );
     final payload = response.data ?? const <dynamic>[];
     final all = payload
         .whereType<Map>()
