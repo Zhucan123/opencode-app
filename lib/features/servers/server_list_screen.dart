@@ -16,7 +16,7 @@ class ServerListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: const Text('OpenCode'),
+        title: const Text('opencode Mobile'),
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline_rounded),

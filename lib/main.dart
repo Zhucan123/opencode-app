@@ -15,7 +15,7 @@ class OpenCodeApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
-      title: 'OpenCode',
+      title: 'opencode Mobile',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       routerConfig: router,
