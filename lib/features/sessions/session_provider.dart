@@ -38,6 +38,15 @@ class SessionListController
     state = AsyncData(await connection.apiClient.getSessions());
   }
 
+  Future<void> renameSession(String sessionId, String title) async {
+    final connection = ref.read(activeConnectionProvider(_serverId));
+    if (connection == null) {
+      throw StateError('当前服务器尚未建立连接。');
+    }
+    await connection.apiClient.renameSession(sessionId, title);
+    state = AsyncData(await connection.apiClient.getSessions());
+  }
+
   Future<void> refreshSessions() async {
     final connection = ref.read(activeConnectionProvider(_serverId));
     if (connection == null) {

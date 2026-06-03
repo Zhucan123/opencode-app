@@ -57,6 +57,10 @@ class OpencodeClient {
     await _dio.delete<void>('/session/$sessionId');
   }
 
+  Future<void> renameSession(String sessionId, String title) async {
+    await _dio.patch<void>('/session/$sessionId', data: {'title': title.trim()});
+  }
+
   /// 加载历史消息，最多返回 [limit] 条（取最新的）
   Future<List<OpencodeMessage>> getMessages(String sessionId) async {
     final response = await _dio.get<List<dynamic>>('/session/$sessionId/message');

@@ -80,6 +80,7 @@ class SessionListScreen extends ConsumerWidget {
                     );
                   },
                   onDelete: () => _deleteSession(context, ref, session),
+                  onRename: () => _renameSession(context, ref, session),
                 );
               },
             );
@@ -140,6 +141,40 @@ class SessionListScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _renameSession(
+    BuildContext context,
+    WidgetRef ref,
+    OpencodeSession session,
+  ) async {
+    final controller = TextEditingController(text: session.title);
+    final newTitle = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.card,
+          title: const Text('重命名会话'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: '标题'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!context.mounted || newTitle == null || newTitle.isEmpty) return;
+    await ref.read(sessionListProvider(serverId).notifier).renameSession(session.id, newTitle);
+  }
+
   Future<void> _deleteSession(
     BuildContext context,
     WidgetRef ref,
@@ -180,134 +215,160 @@ class _SessionCard extends StatelessWidget {
     required this.session,
     required this.onTap,
     required this.onDelete,
+    required this.onRename,
   });
 
   final OpencodeSession session;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onRename;
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: ValueKey(session.id),
-      direction: DismissDirection.endToStart,
-      onDismissed: (_) => onDelete(),
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 24),
-        decoration: BoxDecoration(
-          color: AppColors.danger.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
       ),
-      child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 标题
-                Text(
-                  session.title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        onLongPress: () => _showActions(context),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                session.title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              if (session.agent != null || session.modelId != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (session.agent != null)
+                        _buildTag(
+                          context,
+                          icon: Icons.smart_toy_outlined,
+                          text: session.agent!,
+                          color: AppColors.accent,
+                        ),
+                      if (session.modelId != null)
+                        _buildTag(
+                          context,
+                          icon: Icons.auto_awesome_outlined,
+                          text: session.modelId!,
+                          color: Colors.purpleAccent,
+                        ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-
-                // 标签行
-                if (session.agent != null || session.modelId != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+              Text(
+                session.preview?.trim().isNotEmpty == true
+                    ? session.preview!.trim()
+                    : '点击进入对话...',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textMuted,
+                      height: 1.4,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _formatTime(session.updatedAt ?? session.createdAt),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (session.cost != null || session.totalTokens != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (session.agent != null)
-                          _buildTag(
-                            context,
-                            icon: Icons.smart_toy_outlined,
-                            text: session.agent!,
-                            color: AppColors.accent,
+                        if (session.totalTokens != null && session.totalTokens! > 0)
+                          Text(
+                            _formatTokens(session.totalTokens!),
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: AppColors.textMuted.withOpacity(0.5),
+                                  fontSize: 11,
+                                ),
                           ),
-                        if (session.modelId != null)
-                          _buildTag(
-                            context,
-                            icon: Icons.auto_awesome_outlined,
-                            text: session.modelId!,
-                            color: Colors.purpleAccent,
+                        if (session.totalTokens != null && session.totalTokens! > 0 && session.cost != null && session.cost! > 0)
+                          Text(
+                            ' • ',
+                            style: TextStyle(color: AppColors.textMuted.withOpacity(0.5), fontSize: 11),
+                          ),
+                        if (session.cost != null && session.cost! > 0)
+                          Text(
+                            '\$${session.cost!.toStringAsFixed(3)}',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: AppColors.textMuted.withOpacity(0.8),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 11,
+                                ),
                           ),
                       ],
                     ),
-                  ),
-
-                // 预览文本
-                Text(
-                  session.preview?.trim().isNotEmpty == true
-                      ? session.preview!.trim()
-                      : '点击进入对话...',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textMuted,
-                        height: 1.4,
-                      ),
-                ),
-                const SizedBox(height: 12),
-
-                // 底部信息栏（时间 + 消耗）
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _formatTime(session.updatedAt ?? session.createdAt),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    if (session.cost != null || session.totalTokens != null)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (session.totalTokens != null && session.totalTokens! > 0)
-                            Text(
-                              _formatTokens(session.totalTokens!),
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: AppColors.textMuted.withOpacity(0.5),
-                                    fontSize: 11,
-                                  ),
-                            ),
-                          if (session.totalTokens != null && session.totalTokens! > 0 && session.cost != null && session.cost! > 0)
-                            Text(
-                              ' • ',
-                              style: TextStyle(color: AppColors.textMuted.withOpacity(0.5), fontSize: 11),
-                            ),
-                          if (session.cost != null && session.cost! > 0)
-                            Text(
-                              '\$${session.cost!.toStringAsFixed(3)}',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: AppColors.textMuted.withOpacity(0.8),
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 11,
-                                  ),
-                            ),
-                        ],
-                      ),
-                  ],
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showActions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined, color: AppColors.textPrimary),
+              title: const Text('重命名'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onRename();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+              title: const Text('删除', style: TextStyle(color: AppColors.danger)),
+              onTap: () {
+                Navigator.pop(ctx);
+                onDelete();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
