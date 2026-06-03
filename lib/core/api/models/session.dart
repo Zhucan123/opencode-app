@@ -7,6 +7,8 @@ class OpencodeSession {
     this.updatedAt,
     this.preview,
     this.state,
+    this.agent,
+    this.modelId,
   });
 
   final String id;
@@ -16,10 +18,19 @@ class OpencodeSession {
   final DateTime? updatedAt;
   final String? preview;
   final String? state;
+  final String? agent;
+  final String? modelId;
 
   bool get isSubAgent => parentId != null && parentId!.isNotEmpty;
 
   factory OpencodeSession.fromJson(Map<String, dynamic> json) {
+    String? modelId;
+    if (json['model'] is Map) {
+      modelId = json['model']['id']?.toString();
+    } else if (json['model'] is String) {
+      modelId = json['model'].toString();
+    }
+
     return OpencodeSession(
       id: json['id']?.toString() ?? '',
       title: (json['title']?.toString().trim().isNotEmpty ?? false)
@@ -32,6 +43,8 @@ class OpencodeSession {
           json['lastMessagePreview']?.toString() ??
           json['last_message_preview']?.toString(),
       state: json['state']?.toString(),
+      agent: json['agent']?.toString(),
+      modelId: modelId,
     );
   }
 

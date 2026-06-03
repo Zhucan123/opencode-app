@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:code_app/core/api/models/event.dart';
 import 'package:code_app/core/api/models/message.dart';
 import 'package:code_app/core/api/opencode_client.dart';
+import 'package:code_app/core/storage/server_config_store.dart';
 import 'package:code_app/features/connection/connection_provider.dart';
+import 'package:code_app/features/sessions/session_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ChatProviderArgs {
@@ -133,11 +135,34 @@ class ChatController extends StateNotifier<ChatState> {
       final messages = await connection.apiClient.getMessages(args.sessionId);
       final modes = await connection.apiClient.getModes();
       final models = await connection.apiClient.getModels();
+
+      // 读取会话和本地存储记录
+      final sessions = ref.read(sessionListProvider(args.serverId)).valueOrNull;
+      final currentSession = sessions?.where((s) => s.id == args.sessionId).firstOrNull;
+      
+      final store = ref.read(serverConfigStoreProvider);
+      final lastMode = await store.getLastMode(args.serverId);
+      final lastModelId = await store.getLastModel(args.serverId);
+
+      // 优先级: 1. 服务端当前会话保存的模式/模型  2. 本地存储的当前服务器偏好  3. 列表第一个兜底
+      String? initialMode = currentSession?.agent ?? lastMode;
+      if (!modes.contains(initialMode)) {
+        initialMode = modes.isNotEmpty ? modes.first : null;
+      }
+
+      final sessionModelId = currentSession?.modelId ?? lastModelId;
+      OpencodeModel? initialModel;
+      if (sessionModelId != null) {
+        initialModel = models.where((m) => m.id == sessionModelId).firstOrNull;
+      }
+      initialModel ??= models.isNotEmpty ? models.first : null;
+
       state = state.copyWith(
         messages: messages,
         availableModes: modes,
-        selectedMode: modes.isNotEmpty ? modes.first : null,
+        selectedMode: initialMode,
         availableModels: models,
+        selectedModel: initialModel,
         isLoading: false,
         clearError: true,
       );
@@ -155,10 +180,12 @@ class ChatController extends StateNotifier<ChatState> {
 
   void setMode(String mode) {
     state = state.copyWith(selectedMode: mode);
+    ref.read(serverConfigStoreProvider).saveLastMode(args.serverId, mode);
   }
 
   void setModel(OpencodeModel model) {
     state = state.copyWith(selectedModel: model);
+    ref.read(serverConfigStoreProvider).saveLastModel(args.serverId, model.id);
   }
 
   Future<void> refreshMessages({bool stopStreaming = false}) async {

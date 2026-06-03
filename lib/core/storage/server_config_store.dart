@@ -200,6 +200,22 @@ class ServerConfigStore {
     await saveServer(server.copyWith(lastConnected: DateTime.now()));
   }
 
+  Future<void> saveLastMode(String serverId, String mode) async {
+    await _storage.write(key: 'last_mode_$serverId', value: mode);
+  }
+
+  Future<String?> getLastMode(String serverId) async {
+    return await _storage.read(key: 'last_mode_$serverId');
+  }
+
+  Future<void> saveLastModel(String serverId, String modelId) async {
+    await _storage.write(key: 'last_model_$serverId', value: modelId);
+  }
+
+  Future<String?> getLastModel(String serverId) async {
+    return await _storage.read(key: 'last_model_$serverId');
+  }
+
   String _passwordKey(String serverId) => 'password_$serverId';
   String _pemKey(String serverId) => 'pem_$serverId';
 }
