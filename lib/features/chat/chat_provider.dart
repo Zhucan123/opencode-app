@@ -100,8 +100,12 @@ class ChatController extends StateNotifier<ChatState> {
   final Ref ref;
   final ChatProviderArgs args;
   StreamSubscription<OpencodeEvent>? _subscription;
-  // 流式结束检测：最后一次事件后 3s 无新事件则自动刷新消息列表
-  Timer? _streamEndTimer;
+  // 定期刷新 REST 消息（保持流式气泡内容最新）
+  Timer? _refreshTimer;
+  // 超时停止流式：最后一次事件后 20s 无新事件才结束
+  Timer? _streamStopTimer;
+  // 用户消息的真实 ID（服务端分配），用于过滤掉用户侧 part 事件
+  final Set<String> _userMessageIds = {};
 
   Future<void> _initialize() async {
     final connection = ref.read(activeConnectionProvider(args.serverId));
@@ -143,19 +147,18 @@ class ChatController extends StateNotifier<ChatState> {
     state = state.copyWith(selectedModel: model);
   }
 
-  Future<void> refreshMessages() async {
+  Future<void> refreshMessages({bool stopStreaming = false}) async {
     final connection = ref.read(activeConnectionProvider(args.serverId));
     if (connection == null) return;
-    state = state.copyWith(isLoading: true, clearError: true);
     try {
       final messages = await connection.apiClient.getMessages(args.sessionId);
-      // 刷新完成后清空流式内容，因为 REST 已包含完整数据
       state = state.copyWith(
         messages: messages,
-        streamingParts: const {},
+        streamingParts: stopStreaming ? const {} : state.streamingParts,
         isLoading: false,
-        isStreaming: false,
+        isStreaming: stopStreaming ? false : state.isStreaming,
       );
+      if (stopStreaming) _userMessageIds.clear();
     } catch (error) {
       state = state.copyWith(isLoading: false, error: error.toString());
     }
@@ -207,6 +210,11 @@ class ChatController extends StateNotifier<ChatState> {
     switch (event.type) {
       case OpencodeEventType.sessionUpdated:
       case OpencodeEventType.messageUpdated:
+        // 记录用户消息的真实服务端 ID，后续 part 事件用来过滤
+        if (event.message?.role == MessageRole.user) {
+          final realId = event.message!.id;
+          if (realId.isNotEmpty) _userMessageIds.add(realId);
+        }
         // 只标记流式状态，不修改 messages 列表
         // messages 列表由 REST API 维护，SSE 只做流式内容展示
         state = state.copyWith(isStreaming: true, clearError: true);
@@ -215,6 +223,8 @@ class ChatController extends StateNotifier<ChatState> {
       case OpencodeEventType.messagePartUpdated:
         final part = event.part;
         if (part == null || part.isSkippable || part.type != 'text') return;
+        // 跳过用户消息的 part，避免渲染到 assistant 流式气泡
+        if (_userMessageIds.contains(part.messageId)) return;
         final text = part.text;
         if (text == null || text.isEmpty) return;
 
@@ -225,6 +235,8 @@ class ChatController extends StateNotifier<ChatState> {
       case OpencodeEventType.messagePartDelta:
         final delta = event.partDelta;
         if (delta == null || delta.field != 'text' || delta.delta.isEmpty) return;
+        // 跳过用户消息的 part
+        if (_userMessageIds.contains(delta.messageId)) return;
 
         final currentText = state.streamingParts[delta.messageId]?[delta.partId] ?? '';
         final updated = _updateStreamingPart(
@@ -244,7 +256,8 @@ class ChatController extends StateNotifier<ChatState> {
         return;
 
       case OpencodeEventType.sessionError:
-        _streamEndTimer?.cancel();
+        _refreshTimer?.cancel();
+        _streamStopTimer?.cancel();
         state = state.copyWith(
           isStreaming: false,
           isSending: false,
@@ -259,13 +272,17 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
-  /// 重置流式结束计时器：最后一个事件后 3s 自动刷新消息列表
+  /// 重置流式定时器：
+  /// - 5s 后刷新 REST 消息（保持内容最新，但保持 isStreaming=true）
+  /// - 20s 后强制结束流式（长时间无事件认为已完成）
   void _resetStreamEndTimer() {
-    _streamEndTimer?.cancel();
-    _streamEndTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        refreshMessages();
-      }
+    _refreshTimer?.cancel();
+    _streamStopTimer?.cancel();
+    _refreshTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) refreshMessages();
+    });
+    _streamStopTimer = Timer(const Duration(seconds: 20), () {
+      if (mounted) refreshMessages(stopStreaming: true);
     });
   }
 
@@ -308,7 +325,8 @@ class ChatController extends StateNotifier<ChatState> {
 
   @override
   void dispose() {
-    _streamEndTimer?.cancel();
+    _refreshTimer?.cancel();
+    _streamStopTimer?.cancel();
     _subscription?.cancel();
     super.dispose();
   }
