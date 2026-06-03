@@ -83,132 +83,148 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
+    final hasSelectors = widget.availableModes.isNotEmpty || widget.availableModels.isNotEmpty;
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         decoration: const BoxDecoration(
           color: AppColors.background,
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 模式 + 模型选择行
-            if (widget.availableModes.isNotEmpty || widget.availableModels.isNotEmpty) ...[
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 模式 + 模型 pill 行（内嵌卡片顶部）
+              if (hasSelectors)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                  child: Row(
+                    children: [
+                      if (widget.availableModes.isNotEmpty)
+                        _ModeButton(
+                          enabled: !widget.isBusy,
+                          selected: widget.selectedMode,
+                          modes: widget.availableModes,
+                          onModeSelected: widget.onModeSelected,
+                        ),
+                      if (widget.availableModes.isNotEmpty && widget.availableModels.isNotEmpty)
+                        const SizedBox(width: 6),
+                      if (widget.availableModels.isNotEmpty)
+                        Flexible(
+                          child: _ModelButton(
+                            enabled: !widget.isBusy,
+                            selected: widget.selectedModel,
+                            models: widget.availableModels,
+                            onModelSelected: widget.onModelSelected,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              // 已选图片预览行
+              if (_extraParts.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: List.generate(_extraParts.length, (index) {
+                      final part = _extraParts[index];
+                      final url = part['url'] as String;
+                      final b64 = url.split(',').last;
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.border),
+                              image: DecorationImage(
+                                image: MemoryImage(base64Decode(b64)),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: -6,
+                            right: -6,
+                            child: GestureDetector(
+                              onTap: () => _removeExtraPart(index),
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.card,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.close_rounded, size: 14, color: AppColors.textPrimary),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+              // 输入行：图标 + 输入框 + 发送按钮
               Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (widget.availableModes.isNotEmpty)
-                    _ModeButton(
+                  IconButton(
+                    icon: const Icon(Icons.add_photo_alternate_outlined, color: AppColors.textMuted),
+                    onPressed: widget.isBusy ? null : _pickImage,
+                    padding: const EdgeInsets.fromLTRB(10, 10, 4, 10),
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
                       enabled: !widget.isBusy,
-                      selected: widget.selectedMode,
-                      modes: widget.availableModes,
-                      onModeSelected: widget.onModeSelected,
+                      minLines: 1,
+                      maxLines: 6,
+                      textInputAction: TextInputAction.newline,
+                      decoration: const InputDecoration(
+                        hintText: 'Message OpenCode...',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                      ),
                     ),
-                  if (widget.availableModes.isNotEmpty && widget.availableModels.isNotEmpty)
-                    const SizedBox(width: 8),
-                  if (widget.availableModels.isNotEmpty)
-                    _ModelButton(
-                      enabled: !widget.isBusy,
-                      selected: widget.selectedModel,
-                      models: widget.availableModels,
-                      onModelSelected: widget.onModelSelected,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
+                    child: SizedBox(
+                      width: 36,
+                      height: 36,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          shape: const CircleBorder(),
+                          backgroundColor: widget.isBusy ? AppColors.warning : AppColors.accent,
+                          foregroundColor: widget.isBusy ? Colors.black87 : Colors.white,
+                        ),
+                        onPressed: widget.isBusy ? widget.onAbort : _handleSend,
+                        child: widget.isBusy
+                            ? const Icon(Icons.stop_rounded, size: 18)
+                            : const Icon(Icons.arrow_upward_rounded, size: 16),
+                      ),
                     ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
             ],
-            // 已选图片预览行
-            if (_extraParts.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: List.generate(_extraParts.length, (index) {
-                    final part = _extraParts[index];
-                    final url = part['url'] as String;
-                    final b64 = url.split(',').last;
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.border),
-                            image: DecorationImage(
-                              image: MemoryImage(base64Decode(b64)),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: -6,
-                          right: -6,
-                          child: GestureDetector(
-                            onTap: () => _removeExtraPart(index),
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                color: AppColors.card,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.close_rounded, size: 14, color: AppColors.textPrimary),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }),
-                ),
-              ),
-            // 输入行：全宽输入框 + 发送按钮
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.add_photo_alternate_outlined, color: AppColors.textMuted),
-                  onPressed: widget.isBusy ? null : _pickImage,
-                  padding: const EdgeInsets.only(bottom: 12),
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    enabled: !widget.isBusy,
-                    minLines: 1,
-                    maxLines: 6,
-                    textInputAction: TextInputAction.newline,
-                    decoration: const InputDecoration(
-                      hintText: 'Message OpenCode...',
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      shape: const CircleBorder(),
-                      backgroundColor: widget.isBusy ? AppColors.warning : AppColors.textPrimary,
-                      foregroundColor: widget.isBusy ? Colors.black87 : AppColors.background,
-                    ),
-                    onPressed: widget.isBusy ? widget.onAbort : _handleSend,
-                    child: widget.isBusy
-                        ? const Icon(Icons.stop_rounded, size: 24)
-                        : const Icon(Icons.arrow_upward_rounded, size: 18),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
