@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:code_app/core/api/models/message.dart';
 import 'package:code_app/features/chat/markdown/code_element_builder.dart';
 import 'package:code_app/shared/theme.dart';
@@ -160,8 +162,27 @@ class _ToolExecutionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = part.rawJson?['title']?.toString() ?? '执行工具';
-    final command = part.rawJson?['command']?.toString() ?? part.text;
+    final raw = part.rawJson ?? {};
+
+    // 尝试多种字段名，兼容不同版本的 opencode API
+    final toolName = raw['toolName']?.toString() ??
+        raw['tool']?.toString() ??
+        raw['name']?.toString() ??
+        '执行工具';
+
+    // 工具的详细入参：input / args / command / text，展示 JSON 或字符串
+    final inputRaw = raw['input'] ?? raw['args'] ?? raw['command'];
+    String detail;
+    if (inputRaw is Map || inputRaw is List) {
+      const encoder = JsonEncoder.withIndent('  ');
+      detail = encoder.convert(inputRaw);
+    } else if (inputRaw != null) {
+      detail = inputRaw.toString();
+    } else if (part.text.isNotEmpty) {
+      detail = part.text;
+    } else {
+      detail = raw.isNotEmpty ? const JsonEncoder.withIndent('  ').convert(raw) : '(无详情)';
+    }
     
     return Container(
       decoration: BoxDecoration(
@@ -180,7 +201,7 @@ class _ToolExecutionCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  title,
+                  toolName,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -197,7 +218,7 @@ class _ToolExecutionCard extends StatelessWidget {
                 borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
               ),
               child: SelectableText(
-                command,
+                detail,
                 style: const TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 12,

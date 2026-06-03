@@ -109,8 +109,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     style: FilledButton.styleFrom(
                       padding: EdgeInsets.zero,
                       shape: const CircleBorder(),
-                      backgroundColor: widget.isBusy ? AppColors.danger : AppColors.textPrimary,
-                      foregroundColor: AppColors.background,
+                      backgroundColor: widget.isBusy ? AppColors.warning : AppColors.textPrimary,
+                      foregroundColor: widget.isBusy ? Colors.black87 : AppColors.background,
                     ),
                     onPressed: widget.isBusy ? widget.onAbort : _handleSend,
                     child: widget.isBusy
