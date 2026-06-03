@@ -126,6 +126,7 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
   final Ref ref;
   final String serverId;
   final OpencodeSshClient _sshClient = OpencodeSshClient();
+  DateTime? _lastHealthCheck;
   
   Timer? _heartbeatTimer;
 
@@ -247,16 +248,25 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
   }
 
   Future<void> healthCheckAndReconnect() async {
-    if (state.isConnecting || state.isReconnecting) return;
+    if (!state.isConnected || state.isConnecting || state.isReconnecting) return;
+
+    final now = DateTime.now();
+    if (_lastHealthCheck != null && now.difference(_lastHealthCheck!).inSeconds < 10) {
+      return; // 防抖：10秒内不重复检查
+    }
+    _lastHealthCheck = now;
 
     final existing = ref.read(activeConnectionProvider(serverId));
     if (existing != null) {
       try {
-        await existing.apiClient.getSessions().timeout(const Duration(seconds: 3));
+        await existing.apiClient.getSessions().timeout(const Duration(seconds: 8));
         return; // still healthy
       } catch (_) {
         // unhealthy — tear down and reconnect silently
       }
+    } else {
+      // 实际上如果没有 existing，就不应该被当做 connected
+      return;
     }
 
     state = state.copyWith(status: ConnectionStatus.reconnecting, clearError: true);
@@ -305,6 +315,7 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
     } catch (error) {
       apiClient?.dispose();
       if (sshConnection != null) await sshConnection.close();
+      NotificationService.stopForeground().ignore();
       state = state.copyWith(
         status: ConnectionStatus.error,
         errorMessage: _friendlyError(error),

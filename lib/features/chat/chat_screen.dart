@@ -50,7 +50,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final state = ref.watch(chatProvider(args));
     final connState = ref.watch(connectionProvider(widget.serverId));
     final isReconnecting = connState.isReconnecting;
-    final title = isReconnecting ? '恢复连接中...' : _sessionTitle();
+    final isConnError = connState.status == ConnectionStatus.error;
+    final title = isReconnecting 
+        ? '恢复连接中...' 
+        : (isConnError ? '连接已断开' : _sessionTitle());
     final existingIds = state.messages.map((m) => m.id).toSet();
     final pendingText = state.streamingParts.entries
         .where((e) => !existingIds.contains(e.key))
@@ -60,7 +63,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final lastMessage = state.messages.isNotEmpty ? state.messages.last : null;
     final showThinkingBubble = state.isStreaming && pendingText.isEmpty;
     final showTailBubble = pendingText.isNotEmpty || showThinkingBubble;
-    final isBusy = state.isSending || state.isStreaming || isReconnecting;
+    final isBusy = state.isSending || state.isStreaming || isReconnecting || isConnError;
+
+    ref.listen<ConnectionViewState>(connectionProvider(widget.serverId), (prev, next) {
+      if (prev?.status != ConnectionStatus.error && next.status == ConnectionStatus.error && mounted) {
+        final err = next.errorMessage ?? '连接失败，请手动重试。';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err), backgroundColor: AppColors.danger),
+        );
+      }
+    });
 
     ref.listen<ChatState>(chatProvider(args), (prev, next) {
       if (next.error != null && mounted) {
@@ -88,12 +100,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
               const SizedBox(width: 8),
+            ] else if (isConnError) ...[
+              const Icon(Icons.error_outline, size: 18, color: AppColors.danger),
+              const SizedBox(width: 8),
             ],
             Text(title),
           ],
         ),
         actions: [
-          if (state.messages.isNotEmpty && !isBusy)
+          if (isConnError)
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: '重新连接',
+              onPressed: () => ref.read(connectionProvider(widget.serverId).notifier).connect(),
+            )
+          else if (state.messages.isNotEmpty && !isBusy)
             IconButton(
               icon: const Icon(Icons.undo_rounded),
               tooltip: 'Undo last message',
