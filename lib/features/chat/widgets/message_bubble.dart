@@ -594,9 +594,6 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
     final fileWidgets = <Widget>[];
 
     for (final diff in diffs) {
-      final beforeLines = diff.before.split('\n');
-      final afterLines = diff.after.split('\n');
-
       // 手动实现行级 diff（0.4.1 无 diff_linesToChars）
       final dmp = DiffMatchPatch();
       final beforeLines = diff.before.split('\n');
