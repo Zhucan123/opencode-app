@@ -127,13 +127,24 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
   final String serverId;
   final OpencodeSshClient _sshClient = OpencodeSshClient();
   DateTime? _lastHealthCheck;
-  
   Timer? _heartbeatTimer;
+  Timer? _retryTimer;
 
   @override
   void dispose() {
     _heartbeatTimer?.cancel();
+    _retryTimer?.cancel();
     super.dispose();
+  }
+
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    _retryTimer = Timer(const Duration(seconds: 15), () {
+      if (mounted && state.status == ConnectionStatus.error) {
+        _lastHealthCheck = null; // 重置防抖，允许立即重试
+        healthCheckAndReconnect();
+      }
+    });
   }
 
   void _startMonitoring(ManagedSshConnection sshConnection) {
@@ -152,8 +163,8 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
       }
     }).catchError((_) {});
 
-    // 主动应用层心跳（每 15 秒）
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    // 主动应用层心跳（每 10 秒）
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted && state.status != ConnectionStatus.disconnected) {
         healthCheckAndReconnect();
       }
@@ -248,29 +259,32 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
   }
 
   Future<void> healthCheckAndReconnect() async {
-    if (!state.isConnected || state.isConnecting || state.isReconnecting) return;
+    // 正在连接/重连中跳过；用户主动断开或从未连接也跳过
+    if (state.isConnecting ||
+        state.isReconnecting ||
+        state.status == ConnectionStatus.idle ||
+        state.status == ConnectionStatus.disconnected) return;
 
     final now = DateTime.now();
     if (_lastHealthCheck != null && now.difference(_lastHealthCheck!).inSeconds < 10) {
-      return; // 防抖：10秒内不重复检查
+      return;
     }
     _lastHealthCheck = now;
 
     final existing = ref.read(activeConnectionProvider(serverId));
     if (existing != null) {
+      // 有活跃连接 → 先做 health check
       try {
         await existing.apiClient.getSessions().timeout(const Duration(seconds: 8));
-        return; // still healthy
+        return; // 连接健康，无需重连
       } catch (_) {
-        // unhealthy — tear down and reconnect silently
+        // 不健康，继续走重连
       }
-    } else {
-      // 实际上如果没有 existing，就不应该被当做 connected
-      return;
+      await ref.read(connectionRegistryProvider.notifier).remove(serverId);
     }
+    // existing == null（error 状态）或 health check 失败，直接重连
 
     state = state.copyWith(status: ConnectionStatus.reconnecting, clearError: true);
-    await ref.read(connectionRegistryProvider.notifier).remove(serverId);
 
     final store = ref.read(serverConfigStoreProvider);
     final server = await store.getServer(serverId);
@@ -310,7 +324,7 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
         step: ConnectionStep.ready,
         localPort: localPort,
       );
-      
+
       _startMonitoring(sshConnection);
     } catch (error) {
       apiClient?.dispose();
@@ -320,6 +334,7 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
         status: ConnectionStatus.error,
         errorMessage: _friendlyError(error),
       );
+      _scheduleRetry();
     }
   }
 
