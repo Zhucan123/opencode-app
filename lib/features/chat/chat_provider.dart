@@ -6,6 +6,8 @@ import 'package:code_app/core/api/opencode_client.dart';
 import 'package:code_app/core/storage/server_config_store.dart';
 import 'package:code_app/features/connection/connection_provider.dart';
 import 'package:code_app/features/sessions/session_provider.dart';
+import 'package:code_app/shared/notification_service.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ChatProviderArgs {
@@ -358,6 +360,7 @@ class ChatController extends StateNotifier<ChatState> {
           _refreshTimer?.cancel();
           _streamStopTimer?.cancel();
           refreshMessages(stopStreaming: true);
+          _notifyIfBackground();
           return;
         }
         // 否则继续认为是 streaming 状态
@@ -374,6 +377,7 @@ class ChatController extends StateNotifier<ChatState> {
           _refreshTimer?.cancel();
           _streamStopTimer?.cancel();
           refreshMessages(stopStreaming: true);
+          _notifyIfBackground();
           return;
         }
         state = state.copyWith(
@@ -472,6 +476,20 @@ class ChatController extends StateNotifier<ChatState> {
       case OpencodeEventType.unknown:
         return;
     }
+  }
+
+  void _notifyIfBackground() {
+    FlutterForegroundTask.isAppOnForeground.then((isForeground) {
+      if (!isForeground) {
+        final sessions = ref.read(sessionListProvider(args.serverId)).valueOrNull;
+        final title = sessions
+                ?.where((s) => s.id == args.sessionId)
+                .firstOrNull
+                ?.title ??
+            'OpenCode Chat';
+        NotificationService.notifyAiComplete(title).ignore();
+      }
+    });
   }
 
   /// 重置流式定时器：

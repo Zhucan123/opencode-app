@@ -5,6 +5,7 @@ import 'package:code_app/core/api/sse_client.dart';
 import 'package:code_app/core/ssh/ssh_client.dart';
 import 'package:code_app/core/storage/server_config_store.dart';
 import 'package:code_app/features/servers/server_provider.dart';
+import 'package:code_app/shared/notification_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum ConnectionStatus {
@@ -222,6 +223,8 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
       await store.updateLastConnected(serverId);
       await ref.read(serverListProvider.notifier).refresh();
 
+      NotificationService.startForeground(server.name).ignore();
+
       state = ConnectionViewState(
         status: ConnectionStatus.connected,
         step: ConnectionStep.ready,
@@ -290,6 +293,8 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
             sseClient: sseClient,
           ));
 
+      NotificationService.startForeground(server.name).ignore();
+
       state = ConnectionViewState(
         status: ConnectionStatus.connected,
         step: ConnectionStep.ready,
@@ -308,8 +313,8 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
   }
 
   Future<void> disconnect() async {
-    _heartbeatTimer?.cancel();
     await ref.read(connectionRegistryProvider.notifier).remove(serverId);
+    NotificationService.stopForeground().ignore();
     state = const ConnectionViewState.idle().copyWith(
       status: ConnectionStatus.disconnected,
       step: ConnectionStep.idle,

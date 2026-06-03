@@ -23,6 +23,8 @@ dependencies:
   json_annotation: ^4.8.1
   file_picker: ^8.0.0
   google_fonts: ^6.2.1
+  flutter_foreground_task: ^8.15.0
+  flutter_local_notifications: ^17.2.4
 
 dev_dependencies:
   flutter_test:
