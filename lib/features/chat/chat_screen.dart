@@ -384,4 +384,3 @@ class _StreamingReasoningCard extends StatelessWidget {
     );
   }
 }
-}

@@ -597,25 +597,34 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
       final beforeLines = diff.before.split('\n');
       final afterLines = diff.after.split('\n');
 
-      // 用 diff_match_patch 做行级 diff
+      // 手动实现行级 diff（0.4.1 无 diff_linesToChars）
       final dmp = DiffMatchPatch();
-      final lineResult = dmp.diff_linesToChars(diff.before, diff.after);
-      final diffs2 = dmp.diff_main(
-        lineResult.chars1 as String,
-        lineResult.chars2 as String,
-        false,
-      );
-      dmp.diff_charsToLines(diffs2, lineResult.lineArray as List);
-      dmp.diff_cleanupSemantic(diffs2);
+      final beforeLines = diff.before.split('\n');
+      final afterLines = diff.after.split('\n');
+      final lineToChar = <String, int>{};
+      final lineArray = <String>[''];
+      final sb1 = StringBuffer();
+      final sb2 = StringBuffer();
+      for (final line in [...beforeLines, ...afterLines]) {
+        if (!lineToChar.containsKey(line)) {
+          lineToChar[line] = lineArray.length;
+          lineArray.add(line);
+        }
+      }
+      for (final line in beforeLines) {
+        sb1.writeCharCode(lineToChar[line]!);
+      }
+      for (final line in afterLines) {
+        sb2.writeCharCode(lineToChar[line]!);
+      }
+      final diffs2 = dmp.diff(sb1.toString(), sb2.toString(), false);
+      dmp.diffCleanupSemantic(diffs2);
 
       // 转换为行操作列表
       final ops = <_DiffLine>[];
       for (final d in diffs2) {
-        final lines = d.text.split('\n');
-        for (var i = 0; i < lines.length; i++) {
-          final line = lines[i];
-          if (i == lines.length - 1 && line.isEmpty) continue;
-          ops.add(_DiffLine(op: d.operation, text: line));
+        for (final cu in d.text.codeUnits) {
+          ops.add(_DiffLine(op: d.operation, text: lineArray[cu]));
         }
       }
 
