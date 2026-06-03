@@ -140,6 +140,7 @@ class ChatController extends StateNotifier<ChatState> {
   static const int _pageSize = 20;
   int _currentLimit = 20;
   bool _isLoadingMore = false;
+  final Map<String, String> _partTypes = {};
 
   ChatController(this.args) : super(const ChatState()) {
     _init();
@@ -427,6 +428,8 @@ class ChatController extends StateNotifier<ChatState> {
       case OpencodeEventType.messagePartUpdated:
         final part = event.part;
         if (part == null || part.isSkippable || (part.type != 'text' && part.type != 'reasoning')) return;
+        // 记录 part 类型，供 delta 使用
+        _partTypes[part.id] = part.type;
         // 跳过用户消息的 part，避免渲染到 assistant 流式气泡
         if (_userMessageIds.contains(part.messageId)) return;
         final text = part.text;
@@ -436,12 +439,13 @@ class ChatController extends StateNotifier<ChatState> {
           state = state.copyWith(
             streamingReasoningText: text,
             isStreaming: true,
-            processingLabel: 'OpenCode 正在回复...',
+            processingLabel: 'OpenCode 正在思考...',
           );
         } else {
           final updated = _updateStreamingPart(part.messageId, part.id, text);
           state = state.copyWith(
             streamingParts: updated,
+            streamingReasoningText: '', // 开始输出正文时，清空之前遗留的 reasoning 状态
             isStreaming: true,
             processingLabel: 'OpenCode 正在回复...',
           );
@@ -454,14 +458,26 @@ class ChatController extends StateNotifier<ChatState> {
         // 跳过用户消息的 part
         if (_userMessageIds.contains(delta.messageId)) return;
 
-        final currentText = state.streamingParts[delta.messageId]?[delta.partId] ?? '';
-        final updated = _updateStreamingPart(
-            delta.messageId, delta.partId, currentText + delta.delta);
-        state = state.copyWith(
-          streamingParts: updated,
-          isStreaming: true,
-          processingLabel: 'OpenCode 正在回复...',
-        );
+        final isReasoning = _partTypes[delta.partId] == 'reasoning';
+        
+        if (isReasoning) {
+          final currentReasoning = state.streamingReasoningText;
+          state = state.copyWith(
+            streamingReasoningText: currentReasoning + delta.delta,
+            isStreaming: true,
+            processingLabel: 'OpenCode 正在思考...',
+          );
+        } else {
+          final currentText = state.streamingParts[delta.messageId]?[delta.partId] ?? '';
+          final updated = _updateStreamingPart(
+              delta.messageId, delta.partId, currentText + delta.delta);
+          state = state.copyWith(
+            streamingParts: updated,
+            streamingReasoningText: '', // 输出正文 delta 时，同样清空 reasoning 状态
+            isStreaming: true,
+            processingLabel: 'OpenCode 正在回复...',
+          );
+        }
         return;
 
       case OpencodeEventType.messagePartRemoved:
