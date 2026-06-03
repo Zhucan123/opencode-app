@@ -93,7 +93,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _showPermissionSheet(next.pendingPermission!, args);
       }
       if (mounted) {
-        _scrollToBottom();
+        bool shouldScroll = true;
+        if (_scrollController.hasClients) {
+          final pos = _scrollController.position;
+          // 如果当前位置距离底部不超过 200 像素，认为用户在关注最新消息
+          shouldScroll = (pos.maxScrollExtent - pos.pixels) <= 200;
+        }
+
+        // 如果用户刚刚发送了新消息，强制滚动到底部
+        final justSent = next.isSending && !(prev?.isSending ?? false);
+
+        if (shouldScroll || justSent) {
+          _scrollToBottom();
+        }
       }
     });
 
