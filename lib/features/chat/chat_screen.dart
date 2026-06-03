@@ -33,6 +33,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels <= 80) {
+      final args = ChatProviderArgs(serverId: widget.serverId, sessionId: widget.sessionId);
+      ref.read(chatProvider(args).notifier).loadMore();
+    }
   }
 
   @override
@@ -126,39 +134,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => ref.read(chatProvider(args).notifier).refreshMessages(),
-              child: state.isLoading && state.messages.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.separated(
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-                      itemCount: state.messages.length + (showTailBubble ? 1 : 0),
-                      separatorBuilder: (_, __) => const SizedBox(height: 16),
-                      itemBuilder: (context, index) {
-                        if (showTailBubble && index == state.messages.length) {
-                          if (pendingReasoning.isNotEmpty) {
-                            return _StreamingReasoningCard(text: pendingReasoning);
-                          }
-                          if (pendingText.isNotEmpty) {
-                            return _StreamingBubble(text: pendingText);
-                          }
-                          return _ThinkingBubble(
-                            text: state.processingLabel ?? 'OpenCode 正在思考...',
-                          );
-                        }
-                        final msg = state.messages[index];
-                        final streamingText = state.streamingTextFor(msg.id);
-                        return MessageBubble(
-                          message: msg,
-                          serverId: widget.serverId,
-                          sessionId: widget.sessionId,
-                          streamingText: streamingText.isNotEmpty ? streamingText : null,
+            child: state.isLoading && state.messages.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.separated(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                    itemCount: state.messages.length + (showTailBubble ? 1 : 0) + (state.hasMore ? 1 : 0),
+                    separatorBuilder: (_, __) => const SizedBox(height: 16),
+                    itemBuilder: (context, index) {
+                      // 顶部"加载更多"指示
+                      if (state.hasMore && index == 0) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Center(
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 1.5),
+                            ),
+                          ),
                         );
-                      },
-                    ),
-            ),
+                      }
+                      final msgIndex = state.hasMore ? index - 1 : index;
+                      if (showTailBubble && msgIndex == state.messages.length) {
+                        if (pendingReasoning.isNotEmpty) {
+                          return _StreamingReasoningCard(text: pendingReasoning);
+                        }
+                        if (pendingText.isNotEmpty) {
+                          return _StreamingBubble(text: pendingText);
+                        }
+                        return _ThinkingBubble(
+                          text: state.processingLabel ?? 'OpenCode 正在思考...',
+                        );
+                      }
+                      final msg = state.messages[msgIndex];
+                      final streamingText = state.streamingTextFor(msg.id);
+                      return MessageBubble(
+                        message: msg,
+                        serverId: widget.serverId,
+                        sessionId: widget.sessionId,
+                        streamingText: streamingText.isNotEmpty ? streamingText : null,
+                      );
+                    },
+                  ),
           ),
           ChatInputBar(
             isBusy: isBusy,

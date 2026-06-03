@@ -58,31 +58,24 @@ class OpencodeClient {
   }
 
   /// 加载历史消息，最多返回 [limit] 条（取最新的）
-  Future<List<OpencodeMessage>> getMessages(String sessionId, {int limit = 20}) async {
+  Future<List<OpencodeMessage>> getMessages(String sessionId) async {
     final response = await _dio.get<List<dynamic>>('/session/$sessionId/message');
     final payload = response.data ?? const <dynamic>[];
     final all = payload
         .whereType<Map>()
         .map((item) {
           final map = Map<String, dynamic>.from(item);
-          // 新格式：{ info: {...}, parts: [...] }
           if (map.containsKey('info') && map['info'] is Map) {
             final info = Map<String, dynamic>.from(map['info'] as Map);
             info['parts'] = map['parts'];
             return OpencodeMessage.fromJson(info);
           }
-          // 旧格式：直接是 Message 对象
           return OpencodeMessage.fromJson(map);
         })
         .toList();
-    // 只保留 user / assistant 消息，过滤 system / tool 等弹窗通知类消息
-    final visible = all
+    return all
         .where((m) => m.role == MessageRole.user || m.role == MessageRole.assistant)
         .toList();
-    if (visible.length > limit) {
-      return visible.sublist(visible.length - limit);
-    }
-    return visible;
   }
 
   Future<void> sendPrompt(String sessionId, String text,

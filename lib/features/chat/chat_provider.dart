@@ -29,6 +29,7 @@ class ChatProviderArgs {
 class ChatState {
   const ChatState({
     this.messages = const <OpencodeMessage>[],
+    this.hasMore = false,
     this.streamingParts = const <String, Map<String, String>>{},
     this.streamingReasoningText = '',
     this.availableModes = const <String>[],
@@ -44,6 +45,7 @@ class ChatState {
   });
 
   final List<OpencodeMessage> messages;
+  final bool hasMore;
   final Map<String, Map<String, String>> streamingParts;
   final String streamingReasoningText;
   final List<String> availableModes;
@@ -69,6 +71,7 @@ class ChatState {
 
   ChatState copyWith({
     List<OpencodeMessage>? messages,
+    bool? hasMore,
     Map<String, Map<String, String>>? streamingParts,
     String? streamingReasoningText,
     bool clearStreamingReasoning = false,
@@ -90,6 +93,7 @@ class ChatState {
   }) {
     return ChatState(
       messages: messages ?? this.messages,
+      hasMore: hasMore ?? this.hasMore,
       streamingParts: streamingParts ?? this.streamingParts,
       streamingReasoningText: clearStreamingReasoning ? '' : (streamingReasoningText ?? this.streamingReasoningText),
       availableModes: availableModes ?? this.availableModes,
@@ -130,12 +134,16 @@ class ChatController extends StateNotifier<ChatState> {
   final Ref ref;
   final ChatProviderArgs args;
   StreamSubscription<OpencodeEvent>? _subscription;
-  // 定期刷新 REST 消息（保持流式气泡内容最新）
   Timer? _refreshTimer;
-  // 超时停止流式：最后一次事件后 20s 无新事件才结束
   Timer? _streamStopTimer;
-  // 用户消息的真实 ID（服务端分配），用于过滤掉用户侧 part 事件
   final Set<String> _userMessageIds = {};
+  static const int _pageSize = 20;
+  List<OpencodeMessage> _allMessages = [];
+
+  List<OpencodeMessage> _slice(int count) {
+    if (_allMessages.length <= count) return List.unmodifiable(_allMessages);
+    return List.unmodifiable(_allMessages.sublist(_allMessages.length - count));
+  }
 
   void _swapConnection(ActiveConnection newConnection) {
     _subscription?.cancel();
@@ -191,8 +199,11 @@ class ChatController extends StateNotifier<ChatState> {
       }
       initialModel ??= models.isNotEmpty ? models.first : null;
 
+      _allMessages = messages;
+      final initialSlice = _slice(_pageSize);
       state = state.copyWith(
-        messages: messages,
+        messages: initialSlice,
+        hasMore: _allMessages.length > initialSlice.length,
         availableModes: modes,
         selectedMode: initialMode,
         availableModels: models,
@@ -227,8 +238,11 @@ class ChatController extends StateNotifier<ChatState> {
     if (connection == null) return;
     try {
       final messages = await connection.apiClient.getMessages(args.sessionId);
+      _allMessages = messages;
+      final displayCount = state.messages.isEmpty ? _pageSize : state.messages.length.clamp(_pageSize, _allMessages.length);
       state = state.copyWith(
-        messages: messages,
+        messages: _slice(displayCount),
+        hasMore: _allMessages.length > displayCount,
         streamingParts: stopStreaming ? const {} : state.streamingParts,
         clearStreamingReasoning: stopStreaming,
         isLoading: false,
@@ -239,6 +253,15 @@ class ChatController extends StateNotifier<ChatState> {
     } catch (error) {
       state = state.copyWith(isLoading: false, error: error.toString());
     }
+  }
+
+  void loadMore() {
+    if (!state.hasMore) return;
+    final newCount = (state.messages.length + _pageSize).clamp(0, _allMessages.length);
+    state = state.copyWith(
+      messages: _slice(newCount),
+      hasMore: _allMessages.length > newCount,
+    );
   }
 
   Future<void> sendMessage(String text, {List<Map<String, dynamic>>? extraParts}) async {
