@@ -102,6 +102,12 @@ class _AssistantMessageMarkdown extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: _ToolExecutionCard(part: part),
         ));
+      } else if (part.type == MessagePartType.toolResult) {
+        flushText();
+        children.add(Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: _ToolResultCard(part: part),
+        ));
       } else if (part.type == MessagePartType.patch) {
         flushText();
         children.add(Padding(
@@ -165,10 +171,59 @@ class _ToolExecutionCard extends StatelessWidget {
     final raw = part.rawJson ?? {};
 
     // 尝试多种字段名，兼容不同版本的 opencode API
-    final toolName = raw['toolName']?.toString() ??
+    final rawToolName = raw['toolName']?.toString() ??
         raw['tool']?.toString() ??
         raw['name']?.toString() ??
         '执行工具';
+
+    String displayToolName;
+    IconData toolIcon;
+
+    switch (rawToolName.toLowerCase()) {
+      case 'bash':
+        displayToolName = '执行终端命令';
+        toolIcon = Icons.terminal_rounded;
+        break;
+      case 'read':
+      case 'read_file':
+        displayToolName = '读取文件';
+        toolIcon = Icons.description_outlined;
+        break;
+      case 'write':
+      case 'write_file':
+        displayToolName = '写入文件';
+        toolIcon = Icons.edit_document;
+        break;
+      case 'edit':
+      case 'edit_file':
+        displayToolName = '修改文件';
+        toolIcon = Icons.edit_note_rounded;
+        break;
+      case 'glob':
+        displayToolName = '检索文件';
+        toolIcon = Icons.manage_search_rounded;
+        break;
+      case 'grep':
+        displayToolName = '搜索代码';
+        toolIcon = Icons.find_in_page_outlined;
+        break;
+      case 'google_search':
+      case 'websearch_web_search_exa':
+        displayToolName = '网络搜索';
+        toolIcon = Icons.travel_explore_rounded;
+        break;
+      case 'webfetch':
+        displayToolName = '读取网页';
+        toolIcon = Icons.language_rounded;
+        break;
+      case 'todowrite':
+        displayToolName = '更新任务清单';
+        toolIcon = Icons.checklist_rtl_rounded;
+        break;
+      default:
+        displayToolName = rawToolName == '执行工具' ? rawToolName : '调用工具 ($rawToolName)';
+        toolIcon = Icons.build_circle_outlined;
+    }
 
     // 工具的详细入参：input / args / command / text，展示 JSON 或字符串
     final inputRaw = raw['input'] ?? raw['args'] ?? raw['command'];
@@ -197,11 +252,83 @@ class _ToolExecutionCard extends StatelessWidget {
           iconColor: AppColors.textPrimary,
           title: Row(
             children: [
-              const Icon(Icons.build_circle_outlined, size: 18, color: AppColors.accent),
+              Icon(toolIcon, size: 18, color: AppColors.accent),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  toolName,
+                  displayToolName,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+              ),
+              child: SelectableText(
+                detail,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolResultCard extends StatelessWidget {
+  const _ToolResultCard({required this.part});
+
+  final MessagePart part;
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = part.rawJson ?? {};
+    
+    // 尝试提取结果文本
+    String detail;
+    final resultRaw = raw['result'] ?? raw['output'] ?? raw['stdout'];
+    if (resultRaw is Map || resultRaw is List) {
+      const encoder = JsonEncoder.withIndent('  ');
+      detail = encoder.convert(resultRaw);
+    } else if (resultRaw != null) {
+      detail = resultRaw.toString();
+    } else if (part.text.isNotEmpty) {
+      detail = part.text;
+    } else {
+      detail = raw.isNotEmpty ? const JsonEncoder.withIndent('  ').convert(raw) : '(执行成功)';
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          collapsedIconColor: AppColors.textMuted,
+          iconColor: AppColors.textPrimary,
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle_outline, size: 18, color: Colors.green),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '执行结果',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -241,6 +368,7 @@ class _DiffPreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final diffText = part.text;
+    final lines = diffText.split('\n');
     
     return Container(
       width: double.infinity,
@@ -275,12 +403,32 @@ class _DiffPreviewCard extends StatelessWidget {
               color: Color(0xFF1E1E1E),
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
             ),
-            child: SelectableText(
-              diffText,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                color: Colors.white,
+            child: SelectableText.rich(
+              TextSpan(
+                children: lines.map((line) {
+                  Color? bgColor;
+                  Color textColor = Colors.white;
+                  
+                  if (line.startsWith('+')) {
+                    bgColor = const Color(0x334CAF50); // 浅绿色背景
+                    textColor = Colors.green[300]!;
+                  } else if (line.startsWith('-')) {
+                    bgColor = const Color(0x33F44336); // 浅红色背景
+                    textColor = Colors.red[300]!;
+                  } else if (line.startsWith('@@')) {
+                    textColor = Colors.grey[500]!;
+                  }
+
+                  return TextSpan(
+                    text: '$line\n',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: textColor,
+                      backgroundColor: bgColor,
+                    ),
+                  );
+                }).toList(),
               ),
             ),
           ),

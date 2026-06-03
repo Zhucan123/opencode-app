@@ -2,6 +2,7 @@ import 'package:code_app/features/chat/chat_provider.dart';
 import 'package:code_app/features/chat/widgets/chat_input_bar.dart';
 import 'package:code_app/features/chat/widgets/message_bubble.dart';
 import 'package:code_app/features/chat/widgets/permission_sheet.dart';
+import 'package:code_app/features/chat/markdown/code_element_builder.dart';
 import 'package:code_app/features/sessions/session_provider.dart';
 import 'package:code_app/shared/theme.dart';
 import 'package:code_app/core/api/models/event.dart';
@@ -205,8 +206,20 @@ class _StreamingBubble extends StatelessWidget {
         child: MarkdownBody(
           data: text,
           selectable: false,
+          builders: {
+            'code': CodeElementBuilder(context),
+          },
           styleSheet: MarkdownStyleSheet(
             p: Theme.of(context).textTheme.bodyLarge,
+            code: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor: AppColors.card,
+            ),
+            codeblockDecoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
           ),
         ),
       ),
