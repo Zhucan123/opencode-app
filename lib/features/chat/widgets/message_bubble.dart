@@ -2,19 +2,24 @@ import 'dart:convert';
 
 import 'package:code_app/core/api/models/message.dart';
 import 'package:code_app/features/chat/markdown/code_element_builder.dart';
+import 'package:code_app/features/connection/connection_provider.dart';
 import 'package:code_app/shared/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
     super.key,
     required this.message,
+    required this.serverId,
+    required this.sessionId,
     this.streamingText,
   });
 
   final OpencodeMessage message;
-  /// 流式传输时的累积文本，优先于 message.parts
+  final String serverId;
+  final String sessionId;
   final String? streamingText;
 
   @override
@@ -43,6 +48,8 @@ class MessageBubble extends StatelessWidget {
               ? _UserMessageText(message: message)
               : _AssistantMessageMarkdown(
                   message: message,
+                  serverId: serverId,
+                  sessionId: sessionId,
                   streamingText: streamingText,
                 ),
         ),
@@ -66,9 +73,16 @@ class _UserMessageText extends StatelessWidget {
 }
 
 class _AssistantMessageMarkdown extends StatelessWidget {
-  const _AssistantMessageMarkdown({required this.message, this.streamingText});
+  const _AssistantMessageMarkdown({
+    required this.message,
+    required this.serverId,
+    required this.sessionId,
+    this.streamingText,
+  });
 
   final OpencodeMessage message;
+  final String serverId;
+  final String sessionId;
   final String? streamingText;
 
   @override
@@ -117,9 +131,18 @@ class _AssistantMessageMarkdown extends StatelessWidget {
         ));
       } else if (part.type == MessagePartType.patch) {
         flushText();
+        final messageId = part.rawJson?['messageID']?.toString() ?? message.id;
         children.add(Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: _DiffPreviewCard(part: part),
+          child: _DiffPreviewCard(
+            serverId: serverId,
+            sessionId: sessionId,
+            messageId: messageId,
+            files: (part.rawJson?['files'] as List?)
+                    ?.map((f) => f.toString())
+                    .toList() ??
+                const [],
+          ),
         ));
       } else if (part.type == MessagePartType.image) {
         flushText();
@@ -414,16 +437,58 @@ class _ToolResultCard extends StatelessWidget {
   }
 }
 
-class _DiffPreviewCard extends StatelessWidget {
-  const _DiffPreviewCard({required this.part});
+class _DiffPreviewCard extends ConsumerStatefulWidget {
+  const _DiffPreviewCard({
+    required this.serverId,
+    required this.sessionId,
+    required this.messageId,
+    required this.files,
+  });
 
-  final MessagePart part;
+  final String serverId;
+  final String sessionId;
+  final String messageId;
+  final List<String> files;
+
+  @override
+  ConsumerState<_DiffPreviewCard> createState() => _DiffPreviewCardState();
+}
+
+class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
+  List<FileDiff>? _diffs;
+  bool _loading = true;
+  bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDiff();
+  }
+
+  Future<void> _fetchDiff() async {
+    final conn = ref.read(activeConnectionProvider(widget.serverId));
+    if (conn == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    try {
+      final diffs = await conn.apiClient.getSessionDiff(
+        widget.sessionId,
+        messageId: widget.messageId,
+      );
+      if (mounted) setState(() { _diffs = diffs; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final diffText = part.text;
-    final lines = diffText.split('\n');
-    
+    final diffs = _diffs;
+    final fileCount = diffs?.length ?? widget.files.length;
+    final additions = diffs?.fold(0, (s, d) => s + d.additions) ?? 0;
+    final deletions = diffs?.fold(0, (s, d) => s + d.deletions) ?? 0;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -434,60 +499,140 @@ class _DiffPreviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                const Icon(Icons.difference_outlined, size: 18, color: AppColors.accent),
-                const SizedBox(width: 8),
-                Text(
-                  '代码变更 (Diff)',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: AppColors.border),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
-            ),
-            child: SelectableText.rich(
-              TextSpan(
-                children: lines.map((line) {
-                  Color? bgColor;
-                  Color textColor = Colors.white;
-                  
-                  if (line.startsWith('+')) {
-                    bgColor = const Color(0x334CAF50); // 浅绿色背景
-                    textColor = Colors.green[300]!;
-                  } else if (line.startsWith('-')) {
-                    bgColor = const Color(0x33F44336); // 浅红色背景
-                    textColor = Colors.red[300]!;
-                  } else if (line.startsWith('@@')) {
-                    textColor = Colors.grey[500]!;
-                  }
-
-                  return TextSpan(
-                    text: '$line\n',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      color: textColor,
-                      backgroundColor: bgColor,
+          // Header
+          InkWell(
+            onTap: diffs != null && diffs.isNotEmpty
+                ? () => setState(() => _expanded = !_expanded)
+                : null,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.difference_outlined, size: 18, color: AppColors.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '$fileCount 个文件变更',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  );
-                }).toList(),
+                  ),
+                  if (_loading)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else if (diffs != null && diffs.isNotEmpty) ...[
+                    Text(
+                      '+$additions',
+                      style: const TextStyle(
+                        color: Color(0xFF4CAF50),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '-$deletions',
+                      style: const TextStyle(
+                        color: Color(0xFFF44336),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
+          // Expanded diff view
+          if (_expanded && diffs != null)
+            const Divider(height: 1, color: AppColors.border),
+          if (_expanded && diffs != null)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: _buildDiffContent(context, diffs),
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDiffContent(BuildContext context, List<FileDiff> diffs) {
+    final spans = <TextSpan>[];
+    for (final diff in diffs) {
+      // 文件名行
+      spans.add(TextSpan(
+        text: '─── ${diff.file} ───\n',
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 12,
+          color: AppColors.textMuted,
+          fontWeight: FontWeight.bold,
+        ),
+      ));
+      // 行级 diff：对比 before/after
+      final beforeLines = diff.before.split('\n');
+      final afterLines = diff.after.split('\n');
+      final maxLen = beforeLines.length > afterLines.length
+          ? beforeLines.length
+          : afterLines.length;
+      for (var i = 0; i < maxLen; i++) {
+        final b = i < beforeLines.length ? beforeLines[i] : null;
+        final a = i < afterLines.length ? afterLines[i] : null;
+        if (b == a) {
+          spans.add(TextSpan(
+            text: ' $b\n',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12,
+              color: Colors.white70,
+            ),
+          ));
+        } else {
+          if (b != null) {
+            spans.add(TextSpan(
+              text: '-$b\n',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: Color(0xFFEF9A9A),
+                backgroundColor: Color(0x33F44336),
+              ),
+            ));
+          }
+          if (a != null) {
+            spans.add(TextSpan(
+              text: '+$a\n',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: Color(0xFFA5D6A7),
+                backgroundColor: Color(0x334CAF50),
+              ),
+            ));
+          }
+        }
+      }
+      spans.add(const TextSpan(text: '\n'));
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      color: const Color(0xFF1E1E1E),
+      child: SelectableText.rich(TextSpan(children: spans)),
     );
   }
 }

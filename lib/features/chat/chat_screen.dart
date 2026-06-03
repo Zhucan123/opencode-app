@@ -128,6 +128,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         final streamingText = state.streamingTextFor(msg.id);
                         return MessageBubble(
                           message: msg,
+                          serverId: widget.serverId,
+                          sessionId: widget.sessionId,
                           streamingText: streamingText.isNotEmpty ? streamingText : null,
                         );
                       },

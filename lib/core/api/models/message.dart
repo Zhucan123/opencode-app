@@ -110,6 +110,32 @@ class MessagePart {
   }
 }
 
+class FileDiff {
+  const FileDiff({
+    required this.file,
+    required this.before,
+    required this.after,
+    required this.additions,
+    required this.deletions,
+  });
+
+  final String file;
+  final String before;
+  final String after;
+  final int additions;
+  final int deletions;
+
+  factory FileDiff.fromJson(Map<String, dynamic> json) {
+    return FileDiff(
+      file: json['file']?.toString() ?? '',
+      before: json['before']?.toString() ?? '',
+      after: json['after']?.toString() ?? '',
+      additions: json['additions'] as int? ?? 0,
+      deletions: json['deletions'] as int? ?? 0,
+    );
+  }
+}
+
 class OpencodeMessage {
   const OpencodeMessage({
     required this.id,

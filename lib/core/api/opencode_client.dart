@@ -164,6 +164,20 @@ class OpencodeClient {
     await _dio.post<void>('/session/$sessionId/revert');
   }
 
+  Future<List<FileDiff>> getSessionDiff(String sessionId, {String? messageId}) async {
+    final queryParams = messageId != null ? {'messageID': messageId} : null;
+    final response = await _dio.get<List<dynamic>>(
+      '/session/$sessionId/diff',
+      queryParameters: queryParams,
+    );
+    final payload = response.data ?? const <dynamic>[];
+    return payload
+        .whereType<Map>()
+        .map((item) => FileDiff.fromJson(Map<String, dynamic>.from(item)))
+        .where((d) => d.file.isNotEmpty)
+        .toList();
+  }
+
   void dispose() {
     _dio.close(force: true);
   }
