@@ -6,6 +6,7 @@ import 'package:code_app/shared/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class SessionListScreen extends ConsumerWidget {
   const SessionListScreen({super.key, required this.serverId});
@@ -230,7 +231,7 @@ class _SessionCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: Colors.white.withOpacity(0.08)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -274,18 +275,20 @@ class _SessionCard extends StatelessWidget {
                     ],
                   ),
                 ),
-              Text(
-                session.preview?.trim().isNotEmpty == true
-                    ? session.preview!.trim()
-                    : '点击进入对话...',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textMuted,
-                      height: 1.4,
-                    ),
-              ),
-              const SizedBox(height: 12),
+              if (session.preview?.trim().isNotEmpty == true) ...[
+                Text(
+                  session.preview!.trim(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textMuted,
+                        height: 1.4,
+                      ),
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                const SizedBox(height: 4),
+              ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -300,10 +303,10 @@ class _SessionCard extends StatelessWidget {
                         if (session.totalTokens != null && session.totalTokens! > 0)
                           Text(
                             _formatTokens(session.totalTokens!),
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: AppColors.textMuted.withOpacity(0.5),
-                                  fontSize: 11,
-                                ),
+                            style: GoogleFonts.robotoMono(
+                              color: AppColors.textMuted.withOpacity(0.6),
+                              fontSize: 11,
+                            ),
                           ),
                         if (session.totalTokens != null && session.totalTokens! > 0 && session.cost != null && session.cost! > 0)
                           Text(
@@ -313,11 +316,11 @@ class _SessionCard extends StatelessWidget {
                         if (session.cost != null && session.cost! > 0)
                           Text(
                             '\$${session.cost!.toStringAsFixed(3)}',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: AppColors.textMuted.withOpacity(0.8),
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 11,
-                                ),
+                            style: GoogleFonts.robotoMono(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
                           ),
                       ],
                     ),
@@ -376,6 +379,7 @@ class _SessionCard extends StatelessWidget {
 
   Widget _buildTag(BuildContext context, {required IconData icon, required String text, required Color color}) {
     return Container(
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.45),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
@@ -384,16 +388,20 @@ class _SessionCard extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(icon, size: 10, color: color),
           const SizedBox(width: 4),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
+          Flexible(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
           ),
         ],
       ),
