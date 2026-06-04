@@ -82,7 +82,7 @@ POST   /session/:id/abort                中止当前生成
 POST   /session/:id/revert               撤销最后一条消息
 
 # 权限审批（AI 执行 bash/写文件前需要用户批准）
-POST   /session/:id/permissions/:permId  { decision: "allow"|"deny", permanent: bool }
+POST   /session/:id/permissions/:permId  { response: "once"|"always"|"reject" }
 
 # 实时事件
 GET    /event                            SSE 全局事件流

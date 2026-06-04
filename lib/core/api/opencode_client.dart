@@ -165,10 +165,17 @@ class OpencodeClient {
   }
 
   Future<void> respondToPermission(String sessionId, String permissionId, bool allow, {bool permanent = false}) async {
-    final decision = allow ? 'allow' : 'deny';
+    String responseVal;
+    if (!allow) {
+      responseVal = 'reject';
+    } else if (permanent) {
+      responseVal = 'always';
+    } else {
+      responseVal = 'once';
+    }
     await _dio.post<void>(
       '/session/$sessionId/permissions/$permissionId',
-      data: {'decision': decision, 'permanent': permanent},
+      data: {'response': responseVal},
     );
   }
 
