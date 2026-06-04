@@ -241,27 +241,57 @@ class _ToolExecutionCard extends StatelessWidget {
         (raw['tool_call'] is Map ? raw['tool_call']['name']?.toString() : null) ??
         '执行工具';
 
+    final stateObj = raw['state'] is Map ? raw['state'] as Map : null;
+    final inputObj = stateObj != null ? stateObj['input'] : null;
+    final inputRaw = inputObj ?? raw['input'] ?? raw['args'] ?? raw['command'];
+
+    String? subTitle;
+    if (inputRaw is Map) {
+      if (rawToolName.toLowerCase() == 'bash') {
+        subTitle = inputRaw['description']?.toString() ?? inputRaw['command']?.toString();
+      } else if (rawToolName.toLowerCase() == 'edit' || 
+                 rawToolName.toLowerCase() == 'write' || 
+                 rawToolName.toLowerCase() == 'read' ||
+                 rawToolName.toLowerCase() == 'read_file' ||
+                 rawToolName.toLowerCase() == 'write_file' ||
+                 rawToolName.toLowerCase() == 'edit_file') {
+        subTitle = inputRaw['filePath']?.toString() ?? inputRaw['file_path']?.toString();
+        if (subTitle != null && subTitle.contains('/')) {
+          subTitle = subTitle.split('/').last;
+        }
+      }
+    } else if (inputRaw is String) {
+      subTitle = inputRaw;
+    }
+
+    if (subTitle != null) {
+      subTitle = subTitle.replaceAll('\n', ' ').trim();
+      if (subTitle.length > 30) {
+        subTitle = '${subTitle.substring(0, 27)}...';
+      }
+    }
+
     String displayToolName;
     IconData toolIcon;
 
     switch (rawToolName.toLowerCase()) {
       case 'bash':
-        displayToolName = '执行终端命令';
+        displayToolName = subTitle ?? '执行终端命令';
         toolIcon = Icons.terminal_rounded;
         break;
       case 'read':
       case 'read_file':
-        displayToolName = '读取文件';
+        displayToolName = subTitle != null ? '读取 $subTitle' : '读取文件';
         toolIcon = Icons.description_outlined;
         break;
       case 'write':
       case 'write_file':
-        displayToolName = '写入文件';
+        displayToolName = subTitle != null ? '写入 $subTitle' : '写入文件';
         toolIcon = Icons.edit_document;
         break;
       case 'edit':
       case 'edit_file':
-        displayToolName = '修改文件';
+        displayToolName = subTitle != null ? '修改 $subTitle' : '修改文件';
         toolIcon = Icons.edit_note_rounded;
         break;
       case 'glob':
@@ -290,11 +320,6 @@ class _ToolExecutionCard extends StatelessWidget {
         toolIcon = Icons.build_circle_outlined;
     }
 
-    final stateObj = raw['state'] is Map ? raw['state'] as Map : null;
-
-    // 工具的详细入参：input / args / command / text，展示 JSON 或字符串
-    final inputObj = stateObj != null ? stateObj['input'] : null;
-    final inputRaw = inputObj ?? raw['input'] ?? raw['args'] ?? raw['command'];
     String detail;
     if (inputRaw is Map || inputRaw is List) {
       const encoder = JsonEncoder.withIndent('  ');
