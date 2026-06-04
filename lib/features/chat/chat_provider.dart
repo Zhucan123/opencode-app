@@ -42,6 +42,7 @@ class ChatState {
     this.processingLabel,
     this.error,
     this.pendingPermission,
+    this.pendingQuestion,
   });
 
   final List<OpencodeMessage> messages;
@@ -58,6 +59,7 @@ class ChatState {
   final String? processingLabel;
   final String? error;
   final OpencodeEvent? pendingPermission;
+  final OpencodeEvent? pendingQuestion;
 
   /// 获取某条消息的流式累积文本
   String streamingTextFor(String messageId) {
@@ -90,6 +92,8 @@ class ChatState {
     bool clearError = false,
     OpencodeEvent? pendingPermission,
     bool clearPendingPermission = false,
+    OpencodeEvent? pendingQuestion,
+    bool clearPendingQuestion = false,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
@@ -110,6 +114,9 @@ class ChatState {
         pendingPermission: clearPendingPermission
             ? null
             : (pendingPermission ?? this.pendingPermission),
+        pendingQuestion: clearPendingQuestion
+            ? null
+            : (pendingQuestion ?? this.pendingQuestion),
       );
   }
 }
@@ -346,6 +353,25 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
+  Future<void> respondToQuestion(List<List<String>> answers) async {
+    final questionId = state.pendingQuestion?.permissionId; // It uses the 'id' field, same as permissionId
+    if (questionId == null) return;
+
+    final connection = ref.read(activeConnectionProvider(args.serverId));
+    if (connection == null) return;
+
+    state = state.copyWith(
+      clearPendingQuestion: true,
+      processingLabel: '正在提交选择...',
+    );
+
+    try {
+      await connection.apiClient.respondToQuestion(questionId, answers);
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+    }
+  }
+
   Future<void> abort() async {
     final connection = ref.read(activeConnectionProvider(args.serverId));
     if (connection == null) return;
@@ -511,6 +537,14 @@ class ChatController extends StateNotifier<ChatState> {
           isStreaming: true,
           processingLabel: '等待权限确认...',
           pendingPermission: event,
+        );
+        return;
+
+      case OpencodeEventType.questionAsked:
+        state = state.copyWith(
+          isStreaming: true,
+          processingLabel: '等待您的选择...',
+          pendingQuestion: event,
         );
         return;
 

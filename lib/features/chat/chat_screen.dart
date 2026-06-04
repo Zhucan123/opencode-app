@@ -2,7 +2,7 @@ import 'package:code_app/features/chat/chat_provider.dart';
 import 'package:code_app/features/chat/widgets/chat_input_bar.dart';
 import 'package:code_app/features/chat/widgets/message_bubble.dart';
 import 'package:code_app/features/chat/widgets/permission_sheet.dart';
-import 'package:code_app/features/chat/markdown/code_element_builder.dart';
+import 'package:code_app/features/chat/widgets/question_sheet.dart';
 import 'package:code_app/features/connection/connection_provider.dart';
 import 'package:code_app/features/sessions/session_provider.dart';
 import 'package:code_app/shared/theme.dart';
@@ -91,6 +91,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
       if (prev?.pendingPermission == null && next.pendingPermission != null && mounted) {
         _showPermissionSheet(next.pendingPermission!, args);
+      }
+      if (prev?.pendingQuestion == null && next.pendingQuestion != null && mounted) {
+        _showQuestionSheet(next.pendingQuestion!, args);
       }
       if (mounted) {
         bool shouldScroll = true;
@@ -257,6 +260,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     allow,
                     permanent: permanent,
                   );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _showQuestionSheet(OpencodeEvent event, ChatProviderArgs args) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: QuestionSheet(
+            event: event,
+            onReply: (answers) {
+              Navigator.of(context).pop();
+              ref.read(chatProvider(args).notifier).respondToQuestion(answers);
             },
           ),
         );

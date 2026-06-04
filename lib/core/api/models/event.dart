@@ -11,6 +11,7 @@ enum OpencodeEventType {
   messagePartRemoved,
   toolCalled,
   permissionAsked,
+  questionAsked,
   sessionError,
   sessionStatus,
   unknown;
@@ -25,6 +26,7 @@ enum OpencodeEventType {
       'message.part.removed' => OpencodeEventType.messagePartRemoved,
       'session.next.tool.called' => OpencodeEventType.toolCalled,
       'permission.asked' => OpencodeEventType.permissionAsked,
+      'question.asked' => OpencodeEventType.questionAsked,
       'session.error' => OpencodeEventType.sessionError,
       _ => OpencodeEventType.unknown,
     };
@@ -50,6 +52,7 @@ class OpencodeEvent {
     this.command,
     this.error,
     this.sessionStatusType,
+    this.questions,
   });
 
   final OpencodeEventType type;
@@ -69,6 +72,7 @@ class OpencodeEvent {
   final String? command;
   final String? error;
   final String? sessionStatusType;
+  final List<dynamic>? questions; // for question.asked
 
   factory OpencodeEvent.fromSse({required String eventName, required String data}) {
     Map<String, dynamic> outer;
@@ -153,6 +157,7 @@ class OpencodeEvent {
       command: properties['command']?.toString() ?? inner['command']?.toString(),
       error: properties['error']?.toString() ?? inner['error']?.toString(),
       sessionStatusType: sessionStatusType,
+      questions: properties['questions'] is List ? properties['questions'] as List : null,
     );
   }
 }

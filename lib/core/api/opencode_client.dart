@@ -172,6 +172,13 @@ class OpencodeClient {
     );
   }
 
+  Future<void> respondToQuestion(String questionId, List<List<String>> answers) async {
+    await _dio.post<void>(
+      '/question/$questionId/reply',
+      data: {'answers': answers},
+    );
+  }
+
   Future<void> abort(String sessionId) async {
     await _dio.post<void>('/session/$sessionId/abort');
   }
