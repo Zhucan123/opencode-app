@@ -3,6 +3,7 @@ import 'package:code_app/features/chat/widgets/chat_input_bar.dart';
 import 'package:code_app/features/chat/widgets/message_bubble.dart';
 import 'package:code_app/features/chat/widgets/permission_sheet.dart';
 import 'package:code_app/features/chat/widgets/question_sheet.dart';
+import 'package:code_app/features/chat/markdown/code_element_builder.dart';
 import 'package:code_app/features/connection/connection_provider.dart';
 import 'package:code_app/features/sessions/session_provider.dart';
 import 'package:code_app/shared/theme.dart';
