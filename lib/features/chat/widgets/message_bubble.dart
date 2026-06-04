@@ -1002,7 +1002,6 @@ class _ReasoningCardState extends State<_ReasoningCard> {
     );
   }
 }
-}
 
 class _ImageCard extends StatelessWidget {
   const _ImageCard({required this.imageUrl});
