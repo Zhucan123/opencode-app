@@ -107,6 +107,17 @@ class _AssistantMessageMarkdown extends StatelessWidget {
     }
 
     final lastPatchIndex = message.parts.lastIndexWhere((p) => p.type == MessagePartType.patch);
+    final allModifiedFiles = <String>{};
+    if (lastPatchIndex != -1) {
+      for (final part in message.parts) {
+        if (part.type == MessagePartType.patch) {
+          final files = part.rawJson?['files'] as List?;
+          if (files != null) {
+            allModifiedFiles.addAll(files.map((f) => f.toString()));
+          }
+        }
+      }
+    }
 
     for (var i = 0; i < message.parts.length; i++) {
       final part = message.parts[i];
@@ -161,10 +172,7 @@ class _AssistantMessageMarkdown extends StatelessWidget {
               serverId: serverId,
               sessionId: sessionId,
               messageId: messageId,
-              files: (part.rawJson?['files'] as List?)
-                      ?.map((f) => f.toString())
-                      .toList() ??
-                  const [],
+              files: allModifiedFiles.toList(),
             ),
           ));
         }
@@ -529,7 +537,14 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
         widget.sessionId,
         messageId: widget.messageId,
       );
-      if (mounted) setState(() { _diffs = diffs; _loading = false; });
+      
+      final filteredDiffs = widget.files.isEmpty 
+          ? diffs 
+          : diffs.where((d) => widget.files.any((f) => 
+              d.file.endsWith(f) || f.endsWith(d.file)
+            )).toList();
+
+      if (mounted) setState(() { _diffs = filteredDiffs; _loading = false; });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
