@@ -182,11 +182,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       }
                       final msg = state.messages[msgIndex];
                       final streamingText = state.streamingTextFor(msg.id);
+                      final isCurrentlyStreaming = state.isStreaming && msgIndex == state.messages.length - 1;
                       return MessageBubble(
                         message: msg,
                         serverId: widget.serverId,
                         sessionId: widget.sessionId,
                         streamingText: streamingText.isNotEmpty ? streamingText : null,
+                        isCurrentlyStreaming: isCurrentlyStreaming,
                       );
                     },
                   ),
@@ -354,7 +356,7 @@ class _StreamingReasoningCard extends StatelessWidget {
         child: Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
-            initiallyExpanded: false,
+            initiallyExpanded: true,
             collapsedIconColor: AppColors.textMuted,
             iconColor: AppColors.textMuted,
             tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),

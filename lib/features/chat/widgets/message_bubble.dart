@@ -15,12 +15,14 @@ class MessageBubble extends StatelessWidget {
     required this.serverId,
     required this.sessionId,
     this.streamingText,
+    this.isCurrentlyStreaming = false,
   });
 
   final OpencodeMessage message;
   final String serverId;
   final String sessionId;
   final String? streamingText;
+  final bool isCurrentlyStreaming;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +53,7 @@ class MessageBubble extends StatelessWidget {
                   serverId: serverId,
                   sessionId: sessionId,
                   streamingText: streamingText,
+                  isCurrentlyStreaming: isCurrentlyStreaming,
                 ),
         ),
       ),
@@ -78,12 +81,14 @@ class _AssistantMessageMarkdown extends StatelessWidget {
     required this.serverId,
     required this.sessionId,
     this.streamingText,
+    this.isCurrentlyStreaming = false,
   });
 
   final OpencodeMessage message;
   final String serverId;
   final String sessionId;
   final String? streamingText;
+  final bool isCurrentlyStreaming;
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +115,10 @@ class _AssistantMessageMarkdown extends StatelessWidget {
         flushText();
         children.add(Padding(
           padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: _ReasoningCard(text: part.text),
+          child: _ReasoningCard(
+            text: part.text,
+            isStreaming: isCurrentlyStreaming,
+          ),
         ));
       } else if (part.type == MessagePartType.code) {
         final lang = part.language ?? '';
@@ -921,14 +929,41 @@ class _TodoItem extends StatelessWidget {
   }
 }
 
-class _ReasoningCard extends StatelessWidget {
-  const _ReasoningCard({required this.text});
+class _ReasoningCard extends StatefulWidget {
+  const _ReasoningCard({required this.text, this.isStreaming = false});
 
   final String text;
+  final bool isStreaming;
+
+  @override
+  State<_ReasoningCard> createState() => _ReasoningCardState();
+}
+
+class _ReasoningCardState extends State<_ReasoningCard> {
+  final ExpansionTileController _controller = ExpansionTileController();
+  late bool _wasStreaming;
+
+  @override
+  void initState() {
+    super.initState();
+    _wasStreaming = widget.isStreaming;
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReasoningCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isStreaming && !widget.isStreaming) {
+      // 停止生成，折叠卡片
+      if (_controller.isExpanded) {
+        _controller.collapse();
+      }
+    }
+    _wasStreaming = widget.isStreaming;
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (text.isEmpty) return const SizedBox.shrink();
+    if (widget.text.isEmpty) return const SizedBox.shrink();
     
     return Container(
       decoration: BoxDecoration(
@@ -939,35 +974,26 @@ class _ReasoningCard extends StatelessWidget {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          initiallyExpanded: false,
+          controller: _controller,
+          initiallyExpanded: _wasStreaming,
           collapsedIconColor: AppColors.textMuted,
           iconColor: AppColors.textMuted,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-          minTileHeight: 38,
-          title: Row(
-            children: [
-              const Icon(Icons.psychology_outlined, size: 16, color: AppColors.textMuted),
-              const SizedBox(width: 8),
-              Text(
-                '深度思考',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          title: Text(
+            '深度思考 (Reasoning)',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: AppColors.textMuted,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
-              ),
-            ],
           ),
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: SelectableText(
-                text,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                widget.text,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textMuted.withOpacity(0.8),
-                  height: 1.5,
-                  fontSize: 13,
-                ),
+                      color: AppColors.textMuted,
+                      height: 1.5,
+                    ),
               ),
             ),
           ],
@@ -975,6 +1001,7 @@ class _ReasoningCard extends StatelessWidget {
       ),
     );
   }
+}
 }
 
 class _ImageCard extends StatelessWidget {
