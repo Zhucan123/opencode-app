@@ -106,7 +106,10 @@ class _AssistantMessageMarkdown extends StatelessWidget {
       }
     }
 
-    for (final part in message.parts) {
+    final lastPatchIndex = message.parts.lastIndexWhere((p) => p.type == MessagePartType.patch);
+
+    for (var i = 0; i < message.parts.length; i++) {
+      final part = message.parts[i];
       if (part.type == MessagePartType.text ||
           part.type == MessagePartType.markdown) {
         textBuffer.writeln(part.text);
@@ -149,20 +152,22 @@ class _AssistantMessageMarkdown extends StatelessWidget {
           child: _ToolResultCard(part: part),
         ));
       } else if (part.type == MessagePartType.patch) {
-        flushText();
-        final messageId = part.rawJson?['messageID']?.toString() ?? message.id;
-        children.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: _DiffPreviewCard(
-            serverId: serverId,
-            sessionId: sessionId,
-            messageId: messageId,
-            files: (part.rawJson?['files'] as List?)
-                    ?.map((f) => f.toString())
-                    .toList() ??
-                const [],
-          ),
-        ));
+        if (i == lastPatchIndex) {
+          flushText();
+          final messageId = part.rawJson?['messageID']?.toString() ?? message.id;
+          children.add(Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: _DiffPreviewCard(
+              serverId: serverId,
+              sessionId: sessionId,
+              messageId: messageId,
+              files: (part.rawJson?['files'] as List?)
+                      ?.map((f) => f.toString())
+                      .toList() ??
+                  const [],
+            ),
+          ));
+        }
       } else if (part.type == MessagePartType.image) {
         flushText();
         final imgUrl = part.imageUrl;
@@ -583,10 +588,7 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
           if (_expanded && diffs != null)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: _buildDiffContent(context, diffs),
-              ),
+              child: _buildDiffContent(context, diffs),
             ),
         ],
       ),
@@ -606,10 +608,9 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
       if (spans.isEmpty) continue;
 
       fileWidgets.add(Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             color: const Color(0xFF2A2A2A),
             child: Row(
@@ -650,10 +651,12 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
             ),
           ),
           Container(
-            width: double.infinity,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             color: bgColor,
-            child: SelectableText.rich(TextSpan(children: spans)),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SelectableText.rich(TextSpan(children: spans)),
+            ),
           ),
         ],
       ));
