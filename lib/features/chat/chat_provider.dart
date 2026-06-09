@@ -8,6 +8,7 @@ import 'package:code_app/features/connection/connection_provider.dart';
 import 'package:code_app/features/sessions/session_provider.dart';
 import 'package:code_app/shared/notification_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ChatProviderArgs {
@@ -554,13 +555,18 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   void _notifyIfBackground() {
-    final sessions = ref.read(sessionListProvider(args.serverId)).valueOrNull;
-    final title = sessions
-            ?.where((s) => s.id == args.sessionId)
-            .firstOrNull
-            ?.title ??
-        'OpenCode Chat';
-    NotificationService.notifyAiComplete(title).ignore();
+    final state = WidgetsBinding.instance.lifecycleState;
+    final isBackground = state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.inactive;
+    
+    if (isBackground) {
+      final sessions = ref.read(sessionListProvider(args.serverId)).valueOrNull;
+      final title = sessions
+              ?.where((s) => s.id == args.sessionId)
+              .firstOrNull
+              ?.title ??
+          'OpenCode Chat';
+      NotificationService.notifyAiComplete(title).ignore();
+    }
   }
 
   /// 重置流式定时器：
