@@ -554,17 +554,13 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   void _notifyIfBackground() {
-    FlutterForegroundTask.isAppOnForeground.then((isForeground) {
-      if (!isForeground) {
-        final sessions = ref.read(sessionListProvider(args.serverId)).valueOrNull;
-        final title = sessions
-                ?.where((s) => s.id == args.sessionId)
-                .firstOrNull
-                ?.title ??
-            'OpenCode Chat';
-        NotificationService.notifyAiComplete(title).ignore();
-      }
-    });
+    final sessions = ref.read(sessionListProvider(args.serverId)).valueOrNull;
+    final title = sessions
+            ?.where((s) => s.id == args.sessionId)
+            .firstOrNull
+            ?.title ??
+        'OpenCode Chat';
+    NotificationService.notifyAiComplete(title).ignore();
   }
 
   /// 重置流式定时器：
