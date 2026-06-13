@@ -251,7 +251,19 @@ class ChatController extends StateNotifier<ChatState> {
       );
       if (stopStreaming) _userMessageIds.clear();
     } catch (error) {
-      state = state.copyWith(isLoading: false, error: error.toString());
+      // 静默拦截后台刷新时的网络异常，防止由于手机网络切换或短暂休眠导致隧道断开时满屏报错。
+      // 断线状态会由底层的 connection_provider 自动接管并显示“恢复连接中...”，不需要在这里弹异常。
+      final errorString = error.toString();
+      final isNetworkError = errorString.contains('DioException') || 
+                             errorString.contains('SocketException') || 
+                             errorString.contains('HttpException') || 
+                             errorString.contains('Connection closed');
+      
+      if (isNetworkError) {
+        state = state.copyWith(isLoading: false);
+      } else {
+        state = state.copyWith(isLoading: false, error: error.toString());
+      }
     }
   }
 
@@ -315,17 +327,15 @@ class ChatController extends StateNotifier<ChatState> {
         providerId: state.selectedModel?.providerId,
         extraParts: extraParts,
       );
-      state = state.copyWith(
-        isSending: false,
-        isStreaming: true,
-        processingLabel: 'OpenCode 正在思考...',
-      );
     } catch (error) {
+      final errorString = error.toString();
+      final isNetworkError = errorString.contains('DioException') || 
+                             errorString.contains('SocketException') || 
+                             errorString.contains('HttpException') || 
+                             errorString.contains('Connection closed');
       state = state.copyWith(
-        isSending: false,
-        isStreaming: false,
-        clearProcessingLabel: true,
-        error: error.toString(),
+        isSending: false, 
+        error: isNetworkError ? '网络请求失败，请检查连接或等待自动重连后重试。' : errorString
       );
     }
   }
@@ -350,7 +360,11 @@ class ChatController extends StateNotifier<ChatState> {
         permanent: permanent,
       );
     } catch (error) {
-      state = state.copyWith(error: error.toString());
+      final errorString = error.toString();
+      final isNetworkError = errorString.contains('DioException') || 
+                             errorString.contains('SocketException') || 
+                             errorString.contains('HttpException');
+      state = state.copyWith(error: isNetworkError ? '提交权限选择失败，请检查网络。' : errorString);
     }
   }
 
@@ -369,7 +383,11 @@ class ChatController extends StateNotifier<ChatState> {
     try {
       await connection.apiClient.respondToQuestion(questionId, answers);
     } catch (error) {
-      state = state.copyWith(error: error.toString());
+      final errorString = error.toString();
+      final isNetworkError = errorString.contains('DioException') || 
+                             errorString.contains('SocketException') || 
+                             errorString.contains('HttpException');
+      state = state.copyWith(error: isNetworkError ? '提交选择失败，请检查网络。' : errorString);
     }
   }
 
