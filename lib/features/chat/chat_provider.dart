@@ -240,30 +240,51 @@ class ChatController extends StateNotifier<ChatState> {
     if (connection == null) return;
     try {
       final messages = await connection.apiClient.getMessages(args.sessionId, limit: _currentLimit);
+      
+      bool forceStop = stopStreaming;
+      if (!forceStop && state.isStreaming) {
+        final status = await connection.apiClient.getSessionStatus(args.sessionId);
+        if (status == 'idle') {
+          forceStop = true;
+        }
+      }
+
       state = state.copyWith(
         messages: messages,
         hasMore: messages.length >= _currentLimit,
-        streamingParts: stopStreaming ? const {} : state.streamingParts,
-        clearStreamingReasoning: stopStreaming,
+        streamingParts: forceStop ? const {} : state.streamingParts,
+        clearStreamingReasoning: forceStop,
         isLoading: false,
-        isStreaming: stopStreaming ? false : state.isStreaming,
-        clearProcessingLabel: stopStreaming,
+        isStreaming: forceStop ? false : state.isStreaming,
+        clearProcessingLabel: forceStop,
       );
-      if (stopStreaming) _userMessageIds.clear();
+      if (forceStop) _userMessageIds.clear();
+      
+      // 如果原本没打算停止，但是拉取状态发现已经 idle（说明期间断网丢失了结束事件），补发一个后台通知
+      if (forceStop && !stopStreaming) {
+        _notifyIfBackground();
+      }
     } catch (error) {
       // 静默拦截后台刷新时的网络异常，防止由于手机网络切换或短暂休眠导致隧道断开时满屏报错。
-      // 断线状态会由底层的 connection_provider 自动接管并显示“恢复连接中...”，不需要在这里弹异常。
       final errorString = error.toString();
       final isNetworkError = errorString.contains('DioException') || 
                              errorString.contains('SocketException') || 
                              errorString.contains('HttpException') || 
                              errorString.contains('Connection closed');
       
-      if (isNetworkError) {
-        state = state.copyWith(isLoading: false);
-      } else {
-        state = state.copyWith(isLoading: false, error: error.toString());
+      ChatState newState = state.copyWith(isLoading: false);
+      if (stopStreaming) {
+        newState = newState.copyWith(
+          isStreaming: false,
+          streamingParts: const {},
+          clearStreamingReasoning: true,
+          clearProcessingLabel: true,
+        );
       }
+      if (!isNetworkError) {
+        newState = newState.copyWith(error: errorString);
+      }
+      state = newState;
     }
   }
 
@@ -597,7 +618,16 @@ class ChatController extends StateNotifier<ChatState> {
       if (mounted) refreshMessages();
     });
     _streamStopTimer = Timer(const Duration(seconds: 20), () {
-      if (mounted) refreshMessages(stopStreaming: true);
+      if (mounted) {
+        state = state.copyWith(
+          isStreaming: false,
+          streamingParts: const {},
+          clearStreamingReasoning: true,
+          clearProcessingLabel: true,
+        );
+        _notifyIfBackground();
+        refreshMessages(stopStreaming: true);
+      }
     });
   }
 
