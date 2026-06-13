@@ -127,8 +127,9 @@ final chatProvider = StateNotifierProvider.autoDispose
   (ref, args) => ChatController(ref, args),
 );
 
-class ChatController extends StateNotifier<ChatState> {
+class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserver {
   ChatController(this.ref, this.args) : super(const ChatState(isLoading: true)) {
+    WidgetsBinding.instance.addObserver(this);
     _initialize();
     
     // 监听底层连接的热替换，实现无缝重连
@@ -149,6 +150,19 @@ class ChatController extends StateNotifier<ChatState> {
   int _currentLimit = 20;
   bool _isLoadingMore = false;
   final Map<String, String> _partTypes = {};
+  bool _isAppInBackground = false;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppInBackground = state == AppLifecycleState.paused || 
+                         state == AppLifecycleState.hidden || 
+                         state == AppLifecycleState.inactive;
+                         
+    // 切回前台时，如果 UI 仍卡在生成状态，立刻主动探测一次服务端真实状态
+    if (!_isAppInBackground && this.state.isStreaming) {
+      refreshMessages(stopStreaming: false);
+    }
+  }
 
   void _swapConnection(ActiveConnection newConnection) {
     _subscription?.cancel();
@@ -445,8 +459,14 @@ class ChatController extends StateNotifier<ChatState> {
         if (sessionState == 'ready' || sessionState == 'error' || sessionState == 'stopped') {
           _refreshTimer?.cancel();
           _streamStopTimer?.cancel();
-          refreshMessages(stopStreaming: true);
+          state = state.copyWith(
+            isStreaming: false,
+            streamingParts: const {},
+            clearStreamingReasoning: true,
+            clearProcessingLabel: true,
+          );
           _notifyIfBackground();
+          refreshMessages(stopStreaming: true);
           return;
         }
         // 否则继续认为是 streaming 状态
@@ -462,8 +482,14 @@ class ChatController extends StateNotifier<ChatState> {
         if (statusType == 'idle') {
           _refreshTimer?.cancel();
           _streamStopTimer?.cancel();
-          refreshMessages(stopStreaming: true);
+          state = state.copyWith(
+            isStreaming: false,
+            streamingParts: const {},
+            clearStreamingReasoning: true,
+            clearProcessingLabel: true,
+          );
           _notifyIfBackground();
+          refreshMessages(stopStreaming: true);
           return;
         }
         state = state.copyWith(
@@ -594,10 +620,7 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   void _notifyIfBackground() {
-    final state = WidgetsBinding.instance.lifecycleState;
-    final isBackground = state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.inactive;
-    
-    if (isBackground) {
+    if (_isAppInBackground) {
       final sessions = ref.read(sessionListProvider(args.serverId)).valueOrNull;
       final title = sessions
               ?.where((s) => s.id == args.sessionId)
