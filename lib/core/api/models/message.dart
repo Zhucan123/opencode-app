@@ -143,6 +143,7 @@ class OpencodeMessage {
     required this.parts,
     this.sessionId,
     this.createdAt,
+    this.diffs,
   });
 
   final String id;
@@ -150,6 +151,7 @@ class OpencodeMessage {
   final MessageRole role;
   final List<MessagePart> parts;
   final DateTime? createdAt;
+  final List<FileDiff>? diffs;
 
   String get plainText => parts.map((part) => part.text).join('\n').trim();
 
@@ -159,12 +161,22 @@ class OpencodeMessage {
         ? rawParts.map(MessagePart.fromJson).toList()
         : <MessagePart>[];
 
+    List<FileDiff>? diffs;
+    if (json['summary'] is Map && json['summary']['diffs'] is List) {
+      diffs = (json['summary']['diffs'] as List)
+          .whereType<Map>()
+          .map((item) => FileDiff.fromJson(Map<String, dynamic>.from(item)))
+          .where((d) => d.file.isNotEmpty)
+          .toList();
+    }
+
     return OpencodeMessage(
       id: json['id']?.toString() ?? '',
       sessionId: json['sessionId']?.toString() ?? json['session_id']?.toString(),
       role: MessageRole.fromJson(json['role']),
       parts: partList,
       createdAt: _parseDate(json['createdAt'] ?? json['created_at']),
+      diffs: diffs,
     );
   }
 
@@ -184,6 +196,7 @@ class OpencodeMessage {
     MessageRole? role,
     List<MessagePart>? parts,
     DateTime? createdAt,
+    List<FileDiff>? diffs,
   }) {
     return OpencodeMessage(
       id: id ?? this.id,
@@ -191,6 +204,7 @@ class OpencodeMessage {
       role: role ?? this.role,
       parts: parts ?? this.parts,
       createdAt: createdAt ?? this.createdAt,
+      diffs: diffs ?? this.diffs,
     );
   }
 

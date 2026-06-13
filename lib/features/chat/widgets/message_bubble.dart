@@ -16,6 +16,7 @@ class MessageBubble extends StatelessWidget {
     required this.sessionId,
     this.streamingText,
     this.isCurrentlyStreaming = false,
+    this.sessionDiffs,
   });
 
   final OpencodeMessage message;
@@ -23,6 +24,7 @@ class MessageBubble extends StatelessWidget {
   final String sessionId;
   final String? streamingText;
   final bool isCurrentlyStreaming;
+  final List<FileDiff>? sessionDiffs;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +56,7 @@ class MessageBubble extends StatelessWidget {
                   sessionId: sessionId,
                   streamingText: streamingText,
                   isCurrentlyStreaming: isCurrentlyStreaming,
+                  sessionDiffs: sessionDiffs,
                 ),
         ),
       ),
@@ -82,6 +85,7 @@ class _AssistantMessageMarkdown extends StatelessWidget {
     required this.sessionId,
     this.streamingText,
     this.isCurrentlyStreaming = false,
+    this.sessionDiffs,
   });
 
   final OpencodeMessage message;
@@ -89,6 +93,7 @@ class _AssistantMessageMarkdown extends StatelessWidget {
   final String sessionId;
   final String? streamingText;
   final bool isCurrentlyStreaming;
+  final List<FileDiff>? sessionDiffs;
 
   @override
   Widget build(BuildContext context) {
@@ -165,14 +170,11 @@ class _AssistantMessageMarkdown extends StatelessWidget {
       } else if (part.type == MessagePartType.patch) {
         if (i == lastPatchIndex) {
           flushText();
-          final messageId = part.rawJson?['messageID']?.toString() ?? message.id;
           children.add(Padding(
             padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: _DiffPreviewCard(
-              serverId: serverId,
-              sessionId: sessionId,
-              messageId: messageId,
               files: allModifiedFiles.toList(),
+              preloadedDiffs: sessionDiffs,
             ),
           ));
         }
@@ -498,64 +500,29 @@ class _ToolResultCard extends StatelessWidget {
   }
 }
 
-class _DiffPreviewCard extends ConsumerStatefulWidget {
+class _DiffPreviewCard extends StatefulWidget {
   const _DiffPreviewCard({
-    required this.serverId,
-    required this.sessionId,
-    required this.messageId,
     required this.files,
+    this.preloadedDiffs,
   });
 
-  final String serverId;
-  final String sessionId;
-  final String messageId;
   final List<String> files;
+  final List<FileDiff>? preloadedDiffs;
 
   @override
-  ConsumerState<_DiffPreviewCard> createState() => _DiffPreviewCardState();
+  State<_DiffPreviewCard> createState() => _DiffPreviewCardState();
 }
 
-class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
-  List<FileDiff>? _diffs;
-  bool _loading = true;
+class _DiffPreviewCardState extends State<_DiffPreviewCard> {
   bool _expanded = false;
 
   @override
-  void initState() {
-    super.initState();
-    _fetchDiff();
-  }
-
-  Future<void> _fetchDiff() async {
-    final conn = ref.read(activeConnectionProvider(widget.serverId));
-    if (conn == null) {
-      if (mounted) setState(() => _loading = false);
-      return;
-    }
-    try {
-      final diffs = await conn.apiClient.getSessionDiff(
-        widget.sessionId,
-        messageId: widget.messageId,
-      );
-      
-      final filteredDiffs = widget.files.isEmpty 
-          ? diffs 
-          : diffs.where((d) => widget.files.any((f) => 
-              d.file.endsWith(f) || f.endsWith(d.file)
-            )).toList();
-
-      if (mounted) setState(() { _diffs = filteredDiffs; _loading = false; });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final diffs = _diffs;
+    final diffs = widget.preloadedDiffs;
     final fileCount = diffs?.length ?? widget.files.length;
     final additions = diffs?.fold(0, (s, d) => s + d.additions) ?? 0;
     final deletions = diffs?.fold(0, (s, d) => s + d.deletions) ?? 0;
+    final hasDiffs = diffs != null && diffs.isNotEmpty;
 
     return Container(
       width: double.infinity,
@@ -587,13 +554,13 @@ class _DiffPreviewCardState extends ConsumerState<_DiffPreviewCard> {
                       ),
                     ),
                   ),
-                  if (_loading)
+                  if (diffs == null)
                     const SizedBox(
                       width: 14,
                       height: 14,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  else if (diffs != null && diffs.isNotEmpty) ...[
+                  else if (diffs.isNotEmpty) ...[
                     Text(
                       '+$additions',
                       style: const TextStyle(

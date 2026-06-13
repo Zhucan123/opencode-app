@@ -61,6 +61,20 @@ class OpencodeClient {
     await _dio.patch<void>('/session/$sessionId', data: {'title': title.trim()});
   }
 
+  Future<String> getSessionStatus(String sessionId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/session/status');
+      final data = response.data ?? const <String, dynamic>{};
+      final statusObj = data[sessionId];
+      if (statusObj is Map) {
+        return statusObj['type']?.toString() ?? 'idle';
+      }
+      return 'idle';
+    } catch (_) {
+      return 'idle';
+    }
+  }
+
   /// 加载历史消息，最多返回 [limit] 条（取最新的）
   Future<List<OpencodeMessage>> getMessages(String sessionId, {int? limit}) async {
     final queryParams = limit != null ? {'limit': limit} : null;
@@ -190,20 +204,6 @@ class OpencodeClient {
 
   Future<void> revert(String sessionId) async {
     await _dio.post<void>('/session/$sessionId/revert');
-  }
-
-  Future<List<FileDiff>> getSessionDiff(String sessionId, {String? messageId}) async {
-    final queryParams = messageId != null ? {'messageID': messageId} : null;
-    final response = await _dio.get<List<dynamic>>(
-      '/session/$sessionId/diff',
-      queryParameters: queryParams,
-    );
-    final payload = response.data ?? const <dynamic>[];
-    return payload
-        .whereType<Map>()
-        .map((item) => FileDiff.fromJson(Map<String, dynamic>.from(item)))
-        .where((d) => d.file.isNotEmpty)
-        .toList();
   }
 
   void dispose() {

@@ -187,12 +187,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       final msg = state.messages[msgIndex];
                       final streamingText = state.streamingTextFor(msg.id);
                       final isCurrentlyStreaming = state.isStreaming && msgIndex == state.messages.length - 1;
+
+                      // 向上寻找最近的一条 user 消息，提取其中携带的 diffs 数据
+                      List<FileDiff>? sessionDiffs;
+                      if (msg.role == MessageRole.assistant) {
+                        for (var i = msgIndex - 1; i >= 0; i--) {
+                          if (state.messages[i].role == MessageRole.user) {
+                            sessionDiffs = state.messages[i].diffs;
+                            break;
+                          }
+                        }
+                      }
+
                       return MessageBubble(
                         message: msg,
                         serverId: widget.serverId,
                         sessionId: widget.sessionId,
                         streamingText: streamingText.isNotEmpty ? streamingText : null,
                         isCurrentlyStreaming: isCurrentlyStreaming,
+                        sessionDiffs: sessionDiffs,
                       );
                     },
                   ),
