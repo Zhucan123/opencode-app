@@ -176,11 +176,6 @@ class OpencodeClient {
       data: {'reply': reply},
     );
   }
-    await _dio.post<void>(
-      '/session/$sessionId/permissions/$permissionId',
-      data: {'response': responseVal},
-    );
-  }
 
   Future<void> respondToQuestion(String questionId, List<List<String>> answers) async {
     await _dio.post<void>(
