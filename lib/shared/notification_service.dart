@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -60,20 +62,23 @@ class NotificationService {
 
   static Future<void> notifyAiComplete(String sessionTitle) async {
     if (!_localNotificationsReady) return;
-    const details = AndroidNotificationDetails(
-      'ai_complete_v2',
+    final vibrationPattern = Int64List.fromList([0, 300, 100, 300]);
+    final details = AndroidNotificationDetails(
+      'ai_complete_v3',
       'AI 回复完成',
-      channelDescription: 'opencode AI 完成回复时弹出横幅提醒',
+      channelDescription: 'opencode AI 完成回复时弹出横幅提醒并振动',
       importance: Importance.high,
       priority: Priority.high,
       enableVibration: true,
+      vibrationPattern: vibrationPattern,
+      playSound: true,
       autoCancel: true,
     );
     await _localNotifications.show(
       DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF,
       'AI 回复完成',
       sessionTitle,
-      const NotificationDetails(android: details),
+      NotificationDetails(android: details),
     );
   }
 }
