@@ -61,11 +61,12 @@ class NotificationService {
   static Future<void> notifyAiComplete(String sessionTitle) async {
     if (!_localNotificationsReady) return;
     const details = AndroidNotificationDetails(
-      'opencode_reply',
-      'AI 回复通知',
-      channelDescription: 'opencode AI 完成回复时通知',
+      'ai_complete_v2',
+      'AI 回复完成',
+      channelDescription: 'opencode AI 完成回复时弹出横幅提醒',
       importance: Importance.high,
       priority: Priority.high,
+      enableVibration: true,
       autoCancel: true,
     );
     await _localNotifications.show(
