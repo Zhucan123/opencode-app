@@ -270,6 +270,7 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
         clearStreamingReasoning: forceStop,
         isLoading: false,
         isStreaming: forceStop ? false : state.isStreaming,
+        isSending: forceStop ? false : state.isSending,
         clearProcessingLabel: forceStop,
       );
       if (forceStop) _userMessageIds.clear();
@@ -361,6 +362,11 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
         modelId: state.selectedModel?.id,
         providerId: state.selectedModel?.providerId,
         extraParts: extraParts,
+      );
+      state = state.copyWith(
+        isSending: false,
+        isStreaming: true,
+        processingLabel: 'OpenCode 正在思考...',
       );
     } catch (error) {
       final errorString = error.toString();
