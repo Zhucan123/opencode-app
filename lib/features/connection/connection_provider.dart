@@ -223,9 +223,10 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
       await apiClient.getSessions();
       final sseClient = SseClient(dio: apiClient.dio);
 
+      final actualPort = sshConnection.localPort;
       final activeConnection = ActiveConnection(
         serverId: serverId,
-        localPort: localPort,
+        localPort: actualPort,
         sshConnection: sshConnection,
         apiClient: apiClient,
         sseClient: sseClient,
@@ -240,7 +241,7 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
       state = ConnectionViewState(
         status: ConnectionStatus.connected,
         step: ConnectionStep.ready,
-        localPort: localPort,
+        localPort: actualPort,
       );
       
       _startMonitoring(sshConnection);
@@ -309,9 +310,10 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
       await apiClient.getSessions();
       final sseClient = SseClient(dio: apiClient.dio);
 
+      final actualPort = sshConnection.localPort;
       ref.read(connectionRegistryProvider.notifier).upsert(ActiveConnection(
             serverId: serverId,
-            localPort: localPort,
+            localPort: actualPort,
             sshConnection: sshConnection,
             apiClient: apiClient,
             sseClient: sseClient,
@@ -322,7 +324,7 @@ class ConnectionController extends StateNotifier<ConnectionViewState> {
       state = ConnectionViewState(
         status: ConnectionStatus.connected,
         step: ConnectionStep.ready,
-        localPort: localPort,
+        localPort: actualPort,
       );
 
       _startMonitoring(sshConnection);

@@ -135,7 +135,22 @@ class OpencodeSshClient {
 
     String? tunnelError;
     onStageChanged?.call(SshConnectionStage.establishingTunnel);
-    final localServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, localPort);
+    // 在 OS 层探测真实可用端口，避免上次连接 ServerSocket 未完全释放导致 bind 失败
+    int actualLocalPort = localPort;
+    while (true) {
+      try {
+        final probe = await ServerSocket.bind(
+          InternetAddress.loopbackIPv4,
+          actualLocalPort,
+          shared: false,
+        );
+        await probe.close();
+        break;
+      } on SocketException {
+        actualLocalPort += 1;
+      }
+    }
+    final localServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, actualLocalPort);
     final acceptSubscription = localServer.listen((socket) async {
       try {
         final forward = await client.forwardLocal('localhost', server.opencodePort);
@@ -152,7 +167,7 @@ class OpencodeSshClient {
     });
 
     await _waitForOpencode(
-      localPort,
+      actualLocalPort,
       stdoutBuffer: stdoutBuffer,
       stderrBuffer: stderrBuffer,
       tunnelErrorGetter: () => tunnelError,
@@ -162,7 +177,7 @@ class OpencodeSshClient {
       client: client,
       opencodeSession: session,
       localServer: localServer,
-      localPort: localPort,
+      localPort: actualLocalPort,
       acceptSubscription: acceptSubscription,
       logSubscriptions: [stdoutSubscription, stderrSubscription],
     );
