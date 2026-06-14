@@ -605,7 +605,15 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
     }
   }
 
+  DateTime? _lastNotifyTime;
+
   void _notifyIfBackground() {
+    final now = DateTime.now();
+    if (_lastNotifyTime != null && now.difference(_lastNotifyTime!).inSeconds < 2) {
+      return;
+    }
+    _lastNotifyTime = now;
+
     if (_isAppInBackground) {
       final sessions = ref.read(sessionListProvider(args.serverId)).valueOrNull;
       final title = sessions
