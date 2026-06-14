@@ -467,14 +467,7 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
           );
           _notifyIfBackground();
           refreshMessages(stopStreaming: true);
-          return;
         }
-        // 否则继续认为是 streaming 状态
-        state = state.copyWith(
-          isStreaming: true,
-          processingLabel: state.processingLabel ?? 'OpenCode 正在思考...',
-          clearError: true,
-        );
         return;
 
       case OpencodeEventType.sessionStatus:
@@ -490,13 +483,7 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
           );
           _notifyIfBackground();
           refreshMessages(stopStreaming: true);
-          return;
         }
-        state = state.copyWith(
-          isStreaming: true,
-          processingLabel: state.processingLabel ?? 'OpenCode 正在思考...',
-          clearError: true,
-        );
         return;
 
       case OpencodeEventType.messageUpdated:
@@ -505,13 +492,6 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
           final realId = event.message!.id;
           if (realId.isNotEmpty) _userMessageIds.add(realId);
         }
-        // 只标记流式状态，不修改 messages 列表
-        // messages 列表由 REST API 维护，SSE 只做流式内容展示
-        state = state.copyWith(
-          isStreaming: true,
-          processingLabel: state.processingLabel ?? 'OpenCode 正在思考...',
-          clearError: true,
-        );
         return;
 
       case OpencodeEventType.messagePartUpdated:
