@@ -603,7 +603,7 @@ class _DiffPreviewCardState extends State<_DiffPreviewCard> {
   }
 
   Widget _buildDiffContent(BuildContext context, List<FileDiff> diffs) {
-    const maxLinesPerFile = 120;
+    const maxLinesPerFile = 40;
     const bgColor = Color(0xFF1E1E1E);
 
     final fileWidgets = <Widget>[];
@@ -694,11 +694,12 @@ class _DiffPreviewCardState extends State<_DiffPreviewCard> {
   List<TextSpan> _parsePatchToSpans(String patch, int maxLines) {
     final spans = <TextSpan>[];
     var shownLines = 0;
+    bool wasContext = false; // 用于追踪上一行是否是未修改的上下文
 
     for (final line in patch.split('\n')) {
       if (shownLines >= maxLines) {
         spans.add(TextSpan(
-          text: '... (内容过长，已截断)\n',
+          text: '... (变更过多，已截断)\n',
           style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 11,
@@ -709,52 +710,39 @@ class _DiffPreviewCardState extends State<_DiffPreviewCard> {
       }
 
       if (line.startsWith('---') || line.startsWith('+++')) {
-        // skip file header lines
-        continue;
+        continue; // 忽略文件头
       } else if (line.startsWith('@@')) {
         spans.add(TextSpan(
           text: '$line\n',
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 11,
-            color: AppColors.textMuted.withOpacity(0.6),
-          ),
+          style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppColors.textMuted.withOpacity(0.6)),
         ));
+        wasContext = false;
       } else if (line.startsWith('-')) {
         spans.add(TextSpan(
           text: '$line\n',
-          style: const TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 12,
-            color: Color(0xFFEF9A9A),
-            backgroundColor: Color(0x44F44336),
-          ),
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFFEF9A9A), backgroundColor: Color(0x44F44336)),
         ));
         shownLines++;
+        wasContext = false;
       } else if (line.startsWith('+')) {
         spans.add(TextSpan(
           text: '$line\n',
-          style: const TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 12,
-            color: Color(0xFFA5D6A7),
-            backgroundColor: Color(0x444CAF50),
-          ),
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFFA5D6A7), backgroundColor: Color(0x444CAF50)),
         ));
         shownLines++;
+        wasContext = false;
       } else {
-        spans.add(TextSpan(
-          text: '$line\n',
-          style: const TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 12,
-            color: Colors.white54,
-          ),
-        ));
-        shownLines++;
+        // 未修改的上下文代码，进行折叠处理
+        if (!wasContext) {
+          spans.add(TextSpan(
+            text: '  ... \n',
+            style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppColors.textMuted.withOpacity(0.4)),
+          ));
+          wasContext = true;
+          shownLines++;
+        }
       }
     }
-
     return spans;
   }
 }
