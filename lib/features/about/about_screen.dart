@@ -45,9 +45,9 @@ class _AboutScreenState extends State<AboutScreen> {
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.15),
+                    color: AppColors.accent.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                    border: Border.all(color: AppColors.accent.withOpacity(0.3)),
                   ),
                   child: const Icon(Icons.terminal_rounded, size: 36, color: AppColors.accent),
                 ),
