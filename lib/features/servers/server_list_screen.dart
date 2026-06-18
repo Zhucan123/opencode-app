@@ -23,6 +23,11 @@ class ServerListScreen extends ConsumerWidget {
             onPressed: () => context.push('/help'),
             tooltip: '使用说明',
           ),
+          IconButton(
+            icon: const Icon(Icons.info_outline_rounded),
+            onPressed: () => context.push('/about'),
+            tooltip: '关于',
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(

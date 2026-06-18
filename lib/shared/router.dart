@@ -1,6 +1,7 @@
 import 'package:code_app/core/storage/server_config_store.dart';
 import 'package:code_app/features/chat/chat_screen.dart';
 import 'package:code_app/features/connection/connecting_screen.dart';
+import 'package:code_app/features/about/about_screen.dart';
 import 'package:code_app/features/help/help_screen.dart';
 import 'package:code_app/features/servers/server_form_screen.dart';
 import 'package:code_app/features/servers/server_list_screen.dart';
@@ -19,6 +20,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/help',
         builder: (context, state) => const HelpScreen(),
+      ),
+      GoRoute(
+        path: '/about',
+        builder: (context, state) => const AboutScreen(),
       ),
       GoRoute(
         path: '/servers/new',

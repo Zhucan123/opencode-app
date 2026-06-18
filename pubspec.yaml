@@ -1,7 +1,7 @@
 name: code_app
 description: OpenCode Mobile Phase 1 Flutter app.
 publish_to: 'none'
-version: 1.2.31+31
+version: 1.2.32+32
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -25,6 +25,8 @@ dependencies:
   google_fonts: ^6.2.1
   flutter_foreground_task: ^8.15.0
   flutter_local_notifications: ^17.2.4
+  package_info_plus: ^8.0.0
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:
