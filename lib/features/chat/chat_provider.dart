@@ -609,7 +609,7 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
 
   void _notifyIfBackground() {
     final now = DateTime.now();
-    if (_lastNotifyTime != null && now.difference(_lastNotifyTime!).inSeconds < 2) {
+    if (_lastNotifyTime != null && now.difference(_lastNotifyTime!).inSeconds < 10) {
       return;
     }
     _lastNotifyTime = now;
