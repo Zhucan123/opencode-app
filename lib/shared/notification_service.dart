@@ -64,9 +64,9 @@ class NotificationService {
     if (!_localNotificationsReady) return;
     final vibrationPattern = Int64List.fromList([0, 300, 100, 300]);
     final details = AndroidNotificationDetails(
-      'ai_complete_v4',
+      'ai_complete_native',
       'AI 回复完成',
-      channelDescription: 'opencode AI 完成回复时弹出横幅并振动提醒',
+      channelDescription: 'opencode AI 完成回复时弹出横幅并振动',
       importance: Importance.high,
       priority: Priority.high,
       enableVibration: true,
