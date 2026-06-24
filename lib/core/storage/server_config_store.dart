@@ -216,6 +216,15 @@ class ServerConfigStore {
     return await _storage.read(key: 'last_model_$serverId');
   }
 
+  Future<bool> getPrivacyAgreed() async {
+    final value = await _storage.read(key: 'privacy_agreed');
+    return value == 'true';
+  }
+
+  Future<void> setPrivacyAgreed(bool agreed) async {
+    await _storage.write(key: 'privacy_agreed', value: agreed.toString());
+  }
+
   String _passwordKey(String serverId) => 'password_$serverId';
   String _pemKey(String serverId) => 'pem_$serverId';
 }

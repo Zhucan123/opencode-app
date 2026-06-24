@@ -1,16 +1,47 @@
 import 'package:code_app/core/storage/server_config_store.dart';
 import 'package:code_app/features/connection/connection_provider.dart';
+import 'package:code_app/features/privacy/privacy_dialog.dart';
 import 'package:code_app/features/servers/server_provider.dart';
 import 'package:code_app/shared/theme.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class ServerListScreen extends ConsumerWidget {
+class ServerListScreen extends ConsumerStatefulWidget {
   const ServerListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ServerListScreen> createState() => _ServerListScreenState();
+}
+
+class _ServerListScreenState extends ConsumerState<ServerListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final store = ref.read(serverConfigStoreProvider);
+      final agreed = await store.getPrivacyAgreed();
+
+      if (!agreed && mounted) {
+        final result = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const PrivacyDialog(),
+        );
+
+        if (result == true && mounted) {
+          await store.setPrivacyAgreed(true);
+        } else if (result != true && mounted) {
+          // User rejected privacy agreement
+          SystemNavigator.pop();
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final servers = ref.watch(serverListProvider);
 
     return Scaffold(
@@ -144,7 +175,7 @@ class _ServerCard extends ConsumerWidget {
                               return AlertDialog(
                                 backgroundColor: AppColors.card,
                                 title: const Text('删除服务器'),
-                                content: Text('确定删除“${server.name}”吗？'),
+                                content: Text('确定删除"${server.name}"吗？'),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.of(dialogContext).pop(false),
