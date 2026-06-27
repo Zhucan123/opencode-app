@@ -487,6 +487,32 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
     );
   }
 
+  /// 私有方法：乐观地将 streamingParts 合并到最后一条 assistant 消息
+  /// 避免流式转换时文本内容丢失，然后清空 streamingParts
+  void _flushStreamingParts() {
+    if (state.messages.isEmpty || state.streamingParts.isEmpty) return;
+    final lastMsg = state.messages.last;
+    if (lastMsg.role != MessageRole.assistant) return;
+    final streamingPartsForMsg = state.streamingParts[lastMsg.id];
+    if (streamingPartsForMsg == null || streamingPartsForMsg.isEmpty) return;
+    
+    final combinedText = streamingPartsForMsg.values.join('');
+    if (combinedText.isEmpty) return;
+    
+    final updatedParts = lastMsg.parts.where(
+        (p) => p.type != MessagePartType.text && p.type != MessagePartType.markdown
+    ).toList();
+    updatedParts.add(MessagePart(type: MessagePartType.text, text: combinedText));
+    
+    final updatedMsg = lastMsg.copyWith(parts: updatedParts);
+    final updatedMessages = [
+      ...state.messages.sublist(0, state.messages.length - 1),
+      updatedMsg,
+    ];
+    state = state.copyWith(messages: updatedMessages, streamingParts: const {});
+  }
+
+
   void _handleEvent(OpencodeEvent event) {
     if (!_matchesSession(event)) return;
     _resetStreamEndTimer();
@@ -498,6 +524,8 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
         if (sessionState == 'ready' || sessionState == 'error' || sessionState == 'stopped') {
           _refreshTimer?.cancel();
           _streamStopTimer?.cancel();
+          _flushReasoning();
+          _flushStreamingParts();
           state = state.copyWith(
             isStreaming: false,
             streamingParts: const {},
@@ -514,6 +542,8 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
         if (statusType == 'idle') {
           _refreshTimer?.cancel();
           _streamStopTimer?.cancel();
+          _flushReasoning();
+          _flushStreamingParts();
           state = state.copyWith(
             isStreaming: false,
             clearProcessingLabel: true,
@@ -669,6 +699,8 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
     });
     _streamStopTimer = Timer(const Duration(seconds: 20), () {
       if (mounted) {
+        _flushReasoning();
+        _flushStreamingParts();
         state = state.copyWith(
           isStreaming: false,
           streamingParts: const {},

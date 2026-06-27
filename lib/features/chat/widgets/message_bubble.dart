@@ -125,7 +125,7 @@ class _AssistantMessageMarkdown extends StatelessWidget {
       if (part.type == MessagePartType.text ||
           part.type == MessagePartType.markdown) {
         // Only render text/markdown parts if NOT currently streaming
-        if (!isCurrentlyStreaming) {
+        if (!isCurrentlyStreaming || (streamingText?.isEmpty ?? true)) {
           textBuffer.writeln(part.text);
           textBuffer.writeln();
         }
