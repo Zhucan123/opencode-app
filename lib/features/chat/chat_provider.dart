@@ -454,6 +454,39 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
     }
   }
 
+  /// 私有方法：乐观地将 streamingReasoningText 作为 MessagePart 添加到最后一条 assistant 消息
+  /// 避免流式转换时推理文本丢失，然后清空 streamingReasoningText
+  void _flushReasoning() {
+    if (state.messages.isEmpty || state.streamingReasoningText.isEmpty) return;
+
+    final lastMsg = state.messages.last;
+    if (lastMsg.role != MessageRole.assistant) return;
+
+    // 检查是否已存在 reasoning part
+    final hasReasoningPart = lastMsg.parts.any((p) => p.type == MessagePartType.reasoning);
+    if (hasReasoningPart) return;
+
+    // 乐观添加 reasoning part
+    final updatedParts = [
+      ...lastMsg.parts,
+      MessagePart(
+        type: MessagePartType.reasoning,
+        text: state.streamingReasoningText,
+      ),
+    ];
+
+    final updatedMsg = lastMsg.copyWith(parts: updatedParts);
+    final updatedMessages = [
+      ...state.messages.sublist(0, state.messages.length - 1),
+      updatedMsg,
+    ];
+
+    state = state.copyWith(
+      messages: updatedMessages,
+      streamingReasoningText: '',
+    );
+  }
+
   void _handleEvent(OpencodeEvent event) {
     if (!_matchesSession(event)) return;
     _resetStreamEndTimer();
@@ -483,12 +516,12 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
           _streamStopTimer?.cancel();
           state = state.copyWith(
             isStreaming: false,
-            streamingParts: const {},
-            clearStreamingReasoning: true,
             clearProcessingLabel: true,
           );
           _notifyIfBackground();
-          refreshMessages(stopStreaming: true);
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) refreshMessages(stopStreaming: true);
+          });
         }
         return;
 
@@ -517,10 +550,10 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
             processingLabel: 'OpenCode 正在思考...',
           );
         } else {
+          _flushReasoning();
           final updated = _updateStreamingPart(part.messageId, part.id, text);
           state = state.copyWith(
             streamingParts: updated,
-            streamingReasoningText: '', // 开始输出正文时，清空之前遗留的 reasoning 状态
             isStreaming: true,
             processingLabel: 'OpenCode 正在回复...',
           );
@@ -543,12 +576,12 @@ class ChatController extends StateNotifier<ChatState> with WidgetsBindingObserve
             processingLabel: 'OpenCode 正在思考...',
           );
         } else {
+          _flushReasoning();
           final currentText = state.streamingParts[delta.messageId]?[delta.partId] ?? '';
           final updated = _updateStreamingPart(
               delta.messageId, delta.partId, currentText + delta.delta);
           state = state.copyWith(
             streamingParts: updated,
-            streamingReasoningText: '', // 输出正文 delta 时，同样清空 reasoning 状态
             isStreaming: true,
             processingLabel: 'OpenCode 正在回复...',
           );

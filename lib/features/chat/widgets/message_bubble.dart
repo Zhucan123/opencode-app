@@ -97,10 +97,6 @@ class _AssistantMessageMarkdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (streamingText != null && streamingText!.isNotEmpty) {
-      return _buildMarkdown(context, streamingText!);
-    }
-
     final children = <Widget>[];
     final textBuffer = StringBuffer();
 
@@ -128,8 +124,11 @@ class _AssistantMessageMarkdown extends StatelessWidget {
       final part = message.parts[i];
       if (part.type == MessagePartType.text ||
           part.type == MessagePartType.markdown) {
-        textBuffer.writeln(part.text);
-        textBuffer.writeln();
+        // Only render text/markdown parts if NOT currently streaming
+        if (!isCurrentlyStreaming) {
+          textBuffer.writeln(part.text);
+          textBuffer.writeln();
+        }
       } else if (part.type == MessagePartType.reasoning) {
         flushText();
         children.add(Padding(
@@ -189,13 +188,18 @@ class _AssistantMessageMarkdown extends StatelessWidget {
         }
       } else {
         // Fallback for other unknown types, try to display text if present
-        if (part.text.isNotEmpty) {
+        if (part.text.isNotEmpty && !isCurrentlyStreaming) {
           textBuffer.writeln(part.text);
           textBuffer.writeln();
         }
       }
     }
     flushText();
+
+    // Append streaming text after all parts are rendered (if currently streaming)
+    if (isCurrentlyStreaming && streamingText != null && streamingText!.isNotEmpty) {
+      children.add(_buildMarkdown(context, streamingText!));
+    }
 
     if (children.isEmpty) {
       return const SizedBox.shrink();

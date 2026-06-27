@@ -1,7 +1,7 @@
 name: code_app
 description: OpenCode Mobile Phase 1 Flutter app.
 publish_to: 'none'
-version: 1.2.37+37
+version: 1.2.38+38
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
