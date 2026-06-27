@@ -22,7 +22,7 @@ class PrivacyDialog extends StatelessWidget {
         child: RichText(
           text: TextSpan(
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.text,
+                  color: AppColors.textPrimaryPrimary,
                 ),
             children: [
               const TextSpan(
